@@ -2,8 +2,8 @@
 
 Writes one JSONL per NIAH subtask into ``--out-dir``. Each line is a
 record ``{"prompt": "<chat-templated str>", "answers": ["..."]}`` ready
-for ``inference.encode`` (whose ``meta`` pass-through carries the
-``answers`` field through to ``inference.decode``'s output JSONL, where
+for ``inference.vllm_inference.encode`` (whose ``meta`` pass-through carries the
+``answers`` field through to ``inference.vllm_inference.decode``'s output JSONL, where
 a scorer can pick them up).
 
 Usage:

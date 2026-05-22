@@ -27,16 +27,16 @@ LCLM/
 ├── latent_context/        # Model package: LCLM, LatentEncoder, Adapter,
 │                          # LCLMProcessor, from_pretrained.
 ├── inference/             # Inference entry points.
-│   ├── hf.py              #   reference HF path
-│   ├── vllm.py            #   vLLM-decoder path (LCLMVLLMDecoder)
-│   ├── encode.py          #   two-stage CLI: HF encoder → embeds.pt
-│   ├── decode.py          #   two-stage CLI: vLLM decoder reads embeds.pt
+│   ├── hf.py              #   reference HF path (single process, single GPU)
+│   ├── vllm_inference/    #   two-stage vLLM CLI
+│   │   ├── encode.py      #     HF encoder → embeds.pt
+│   │   └── decode.py      #     vLLM decoder reads embeds.pt
 │   └── examples/          #   runnable demos + eval drivers (see README)
 ├── train/                 # Training entry points.
 │   ├── launch_train.py    #   CLI
 │   └── trainer.py         #   training loop, checkpointing, auto-resume
 ├── scripts/               # Launch wrappers + YAML configs.
-│   ├── run_pipeline.sh    #   end-to-end pipeline (adapter→encoder→decoder→SFT)
+│   ├── run_pipeline.sh    #   end-to-end (adapter → enc/dec continual pretrain → SFT)
 │   ├── convert_checkpoint.sh
 │   ├── experiment_config/ #   per-experiment YAMLs
 │   ├── pretrain_config/   #   pretrain-stage YAMLs
@@ -63,9 +63,9 @@ model = LCLM.from_pretrained("latent-context/0.6b-4b-LCLM-16x")
 # 2. Two-stage CLI via vLLM (HF encoder + vLLM decoder in separate
 #    processes — this is the path for batched eval / serving). Running
 #    both in one process OOMs: vLLM grabs all GPU memory at init.
-python -m inference.encode --checkpoint latent-context/0.6b-4b-LCLM-16x \
+python -m inference.vllm_inference.encode --checkpoint latent-context/0.6b-4b-LCLM-16x \
     --prompts-jsonl prompts.jsonl --out embeds.pt
-python -m inference.decode --checkpoint latent-context/0.6b-4b-LCLM-16x \
+python -m inference.vllm_inference.decode --checkpoint latent-context/0.6b-4b-LCLM-16x \
     --embeds-pt embeds.pt --out completions.jsonl
 
 # 3. End-to-end RULER NIAH eval (wraps the two-stage CLI + scoring)
@@ -82,7 +82,7 @@ Text to compress should be wrapped between `<|memory_start|>` and
 ## Training
 
 Driven by a single experiment YAML that defines four stages: **adapter
-warm-up → encoder pretrain → decoder pretrain → SFT.** Each stage runs
+warm-up → encoder continual pretrain → decoder continual pretrain → SFT.** Each stage runs
 under accelerate (DeepSpeed by default) and the pipeline converts the
 distributed checkpoint to the HF layout between stages.
 

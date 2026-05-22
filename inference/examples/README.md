@@ -30,14 +30,14 @@ the HF encoder.
 
 ```bash
 # Step 1: HF encoder over a jsonl of prompts → embeds.pt
-python -m inference.encode \
+python -m inference.vllm_inference.encode \
     --checkpoint latent-context/0.6b-4b-LCLM-16x \
     --prompts-jsonl prompts.jsonl \
     --out embeds.pt \
     --max-encode-batch-size 128
 
 # Step 2: vLLM decoder reads embeds.pt → completions.jsonl
-python -m inference.decode \
+python -m inference.vllm_inference.decode \
     --checkpoint latent-context/0.6b-4b-LCLM-16x \
     --embeds-pt embeds.pt \
     --out completions.jsonl \

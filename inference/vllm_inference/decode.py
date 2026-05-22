@@ -5,7 +5,7 @@ reads the tensors produced by ``encode.py``, runs batched generation, and
 writes per-sample completions to a JSONL.
 
 Usage:
-    python -m inference.decode \\
+    python -m inference.vllm_inference.decode \\
         --checkpoint latent-context/0.6b-4b-LCLM-16x \\
         --embeds-pt prompt_embeds.pt \\
         --out completions.jsonl \\

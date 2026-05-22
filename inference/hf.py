@@ -4,7 +4,7 @@ Exposes ``load_model`` and ``generate_text`` for loading an LCLM checkpoint
 and running prompt-by-prompt generation on a single device.
 
 For production serving with paged attention and continuous batching,
-see ``inference.vllm.LCLMVLLMDecoder``.
+see ``inference.vllm_inference`` (two-stage encode/decode CLI).
 """
 
 import json

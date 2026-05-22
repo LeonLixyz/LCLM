@@ -7,7 +7,7 @@ runs vLLM. Splitting the two halves into separate processes avoids the OOM
 you get when vLLM eagerly grabs the entire GPU.
 
 Usage:
-    python -m inference.encode \\
+    python -m inference.vllm_inference.encode \\
         --checkpoint latent-context/0.6b-4b-LCLM-16x \\
         --prompts-jsonl prompts.jsonl \\
         --out prompt_embeds.pt
@@ -40,7 +40,7 @@ def main():
 
     # Lazy imports so --help is fast and the import error path is obvious.
     from latent_context import from_pretrained
-    from inference.vllm import _build_prompt_embeds_batch
+    from inference.vllm_inference._prompt_embeds import _build_prompt_embeds_batch
 
     records = [json.loads(line) for line in Path(args.prompts_jsonl).read_text().splitlines() if line.strip()]
     prompts = [r["prompt"] for r in records]

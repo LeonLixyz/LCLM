@@ -1,4 +1,4 @@
-"""RULER NIAH eval — runs ``inference.encode`` + ``inference.decode`` over
+"""RULER NIAH eval — runs ``inference.vllm_inference.encode`` + ``inference.vllm_inference.decode`` over
 already-prepared per-task prompts.jsonl files and scores each with
 ruler_string_match_all (lowercase substring containment).
 
@@ -62,7 +62,7 @@ def main():
     print(f"\n=== Stage 1: encode (HF) ===", flush=True)
     for task, pf in zip(tasks, prompt_files):
         _run([
-            sys.executable, "-m", "inference.encode",
+            sys.executable, "-m", "inference.vllm_inference.encode",
             "--checkpoint", args.checkpoint,
             "--prompts-jsonl", str(pf),
             "--out", str(work / f"{task}_embeds.pt"),
@@ -72,7 +72,7 @@ def main():
     print(f"\n=== Stage 2: decode (vLLM) ===", flush=True)
     for task in tasks:
         _run([
-            sys.executable, "-m", "inference.decode",
+            sys.executable, "-m", "inference.vllm_inference.decode",
             "--checkpoint", args.checkpoint,
             "--embeds-pt", str(work / f"{task}_embeds.pt"),
             "--out", str(work / f"{task}_completions.jsonl"),
