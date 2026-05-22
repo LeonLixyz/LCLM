@@ -81,19 +81,57 @@ Text to compress should be wrapped between `<|memory_start|>` and
 
 ## Training
 
-End-to-end pipeline (adapter → encoder → decoder → SFT) via
-accelerate / DeepSpeed:
+Driven by a single experiment YAML that defines four stages: **adapter
+warm-up → encoder pretrain → decoder pretrain → SFT.** Each stage runs
+under accelerate (DeepSpeed by default) and the pipeline converts the
+distributed checkpoint to the HF layout between stages.
+
+### One-line full pipeline
 
 ```bash
 OUTPUT_DIR=./checkpoints bash scripts/run_pipeline.sh \
-    scripts/experiment_config/0.6b-4b-cs16-mean-w1024-bidirectional-mlp-O0.yaml
+    scripts/experiment_config/0.6b-4b-cs4-mean-w1024-causal-mlp-O0.yaml
 ```
 
-For FSDP, swap to a `*-fsdp.yaml` distributed config (or set
-`DISTRIBUTED_TYPE=fsdp`). Distributed configs live in
-`scripts/distributed_configs/`.
+`OUTPUT_DIR` is required; everything else lives in the YAML.
 
-Key env vars:
+### Configs
+
+| Path | What's in it |
+|---|---|
+| `scripts/experiment_config/` | Full end-to-end runs. Naming: `{enc}-{dec}-cs{N}-{pooling}-w{W}-{mask}-{adapter}-O{O}.yaml` — e.g. `0.6b-4b-cs16-mean-w1024-bidirectional-mlp-O0.yaml`. |
+| `scripts/pretrain_config/` | Pretrain-only sweeps over adapter / encoder layouts. Naming: `{pooling}-w{W}-{mask}-{adapter}-O{O}.yaml`. |
+| `scripts/distributed_configs/` | Accelerate launcher configs: `deepspeed_zero{1,2,3}*.yaml`, `fsdp_*.yaml`, `ddp_multi_node.yaml`. |
+
+To match the released checkpoints, the relevant axes are
+`pooling=mean`, `mask=causal`, `adapter=mlp`, `boundary_overlap=0`,
+`encoder_window_size=1024`. Pick the `csN` matching the compression
+ratio you want (4 / 8 / 16).
+
+### Single stage
+
+```bash
+# launch_train.py is the CLI; trainer.py owns the loop.
+accelerate launch \
+    --config_file scripts/distributed_configs/deepspeed_zero1.yaml \
+    -m train.launch_train \
+    --config scripts/experiment_config/0.6b-4b-cs4-mean-w1024-causal-mlp-O0.yaml \
+    --stage 1 \
+    --output_dir ./checkpoints
+```
+
+### FSDP
+
+Swap the accelerate config:
+
+```bash
+DIST_TRAIN_CONFIG=scripts/distributed_configs/fsdp_hybrid_shard.yaml \
+DISTRIBUTED_TYPE=fsdp \
+OUTPUT_DIR=./checkpoints bash scripts/run_pipeline.sh \
+    scripts/experiment_config/0.6b-4b-cs4-mean-w1024-causal-mlp-O0.yaml
+```
+
+### Env vars
 
 | Var | Default | What it does |
 |-----|---------|--------------|
@@ -102,10 +140,15 @@ Key env vars:
 | `RESUME_FROM_CHECKPOINT` | `""` | Resume from a specific HF checkpoint. |
 | `DISTRIBUTED_TYPE` | `deepspeed` | `deepspeed` or `fsdp`. |
 | `DIST_TRAIN_CONFIG` | `scripts/distributed_configs/deepspeed_zero1_multi_node.yaml` | Accelerate config path. |
+| `DS_HOSTFILE` | unset | DeepSpeed hostfile for multi-node. |
 
-See `train/trainer.py` for the checkpoint / resume logic and
-`utils/checkpoints/` for converting raw distributed checkpoints to the
-HF-style layout the loader expects.
+### Checkpoint conversion
+
+`scripts/convert_checkpoint.sh` converts a raw FSDP / DeepSpeed
+checkpoint to the HF-style `{decoder, encoder, adapter}/` layout the
+LCLM loader (and the published checkpoints) use. The pipeline calls it
+between stages automatically. See `utils/checkpoints/` for the inner
+scripts and `train/trainer.py` for the checkpoint / resume logic.
 
 ## Citation
 
