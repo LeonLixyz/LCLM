@@ -103,12 +103,3 @@ print(ds[0]["extra_info"]["ground_truth"]["answers"])
 
 Schema for every row: `prompt: str`, `category: str`, `extra_info: dict`.
 
-## Running on Modal
-
-Reference Modal orchestration lives in `_modal_run/lclm_ruler_vllm.py` —
-single H200 container, `uv sync` against the repo's `pyproject.toml`,
-encode + decode + scoring all driven from one function.
-
-```bash
-modal run --detach _modal_run/lclm_ruler_vllm.py::run_eval
-```

@@ -3,13 +3,15 @@
 Code for *End-to-End Context Compression at Scale*. An LCLM is an
 encoder–decoder soft-token compressor: an encoder maps a long input to
 a short sequence of latent tokens, and a decoder consumes those latents
-in place of the original tokens. With a 0.6B encoder and a 4B decoder
-trained end-to-end on ~350B tokens, LCLMs achieve a new Pareto frontier
-between long-context accuracy, time-to-first-token, and peak GPU memory.
+in place of the original tokens.
+
+Trained checkpoints: [`latent-context/0.6b-4b-LCLM-{4,8,16}x`](https://huggingface.co/latent-context).
+Eval datasets: [`latent-context/lclm-eval`](https://huggingface.co/datasets/latent-context/lclm-eval).
 
 ## Install
 
 ```bash
+git clone https://github.com/LeonLixyz/LCLM && cd LCLM
 curl -LsSf https://astral.sh/uv/install.sh | sh
 uv sync
 # If flash-attn fails to build:
@@ -18,76 +20,79 @@ uv run pip install flash-attn --no-build-isolation
 
 If you need `nvcc`: `conda install -c nvidia cuda-nvcc`.
 
-## Quick start
+## Repo layout
 
-### Load an LCLM (HuggingFace Transformers)
+```
+LCLM/
+├── latent_context/        # Model package: LCLM, LatentEncoder, Adapter,
+│                          # LCLMProcessor, from_pretrained.
+├── inference/             # Inference entry points.
+│   ├── hf.py              #   reference HF path
+│   ├── vllm.py            #   vLLM-decoder path (LCLMVLLMDecoder)
+│   ├── encode.py          #   two-stage CLI: HF encoder → embeds.pt
+│   ├── decode.py          #   two-stage CLI: vLLM decoder reads embeds.pt
+│   └── examples/          #   runnable demos + eval drivers (see README)
+├── train/                 # Training entry points.
+│   ├── launch_train.py    #   CLI
+│   └── trainer.py         #   training loop, checkpointing, auto-resume
+├── scripts/               # Launch wrappers + YAML configs.
+│   ├── run_pipeline.sh    #   end-to-end pipeline (adapter→encoder→decoder→SFT)
+│   ├── convert_checkpoint.sh
+│   ├── experiment_config/ #   per-experiment YAMLs
+│   ├── pretrain_config/   #   pretrain-stage YAMLs
+│   └── distributed_configs/  # accelerate / deepspeed / fsdp
+├── agent/                 # Agent app — EXPAND(i) tool over compressed segments.
+├── data/                  # Training datasets, collators, dynamic packing.
+└── utils/                 # Helpers + checkpoint-conversion shell scripts.
+```
+
+## Inference
+
+All four entry points are documented in
+[`inference/examples/README.md`](inference/examples/README.md). Quick
+pointers:
 
 ```python
+# 1. One-shot via HuggingFace Transformers
 from latent_context import LCLM
-
-# Auto-detects both layouts:
-#   new:     model/{decoder, encoder, adapter}/
-#   legacy:  model/{llm, embedder, projectors}/
 model = LCLM.from_pretrained("latent-context/0.6b-4b-LCLM-16x")
+# see inference/hf.py for generate_text
 
-prompt = (
-    "<|memory_start|>"
-    "<long document, code, or text to compress>"
-    "<|memory_end|> "
-    "Summarize the document above."
-)
-```
-
-Or via the function form:
-
-```python
-from latent_context import from_pretrained
-
-model, tokenizer, processor = from_pretrained("latent-context/0.6b-4b-LCLM-16x")
-```
-
-### Production inference (vLLM)
-
-The decoder runs in vLLM (paged attention, continuous batching); the
-encoder stays in HuggingFace Transformers.
-
-```python
+# 2. One-shot via vLLM (HF encoder + vLLM decoder)
 from inference.vllm import LCLMVLLMDecoder
-
 runner = LCLMVLLMDecoder("latent-context/0.6b-4b-LCLM-16x", tensor_parallel_size=2)
 outputs = runner.generate(
     prompts=[[{"role": "user", "content": "<|memory_start|>...<|memory_end|> Summarize."}]],
     max_tokens=512, temperature=0.0,
 )
-print(outputs[0])
 ```
-
-Runnable end-to-end demos:
 
 ```bash
-python -m inference.examples.example_hf   --checkpoint latent-context/0.6b-4b-LCLM-16x --prompt "..."
-python -m inference.examples.example_vllm --checkpoint latent-context/0.6b-4b-LCLM-16x --prompt "..."
+# 3. Two-stage CLI (encode-once, decode-many — good for large sweeps)
+python -m inference.encode --checkpoint latent-context/0.6b-4b-LCLM-16x \
+    --prompts-jsonl prompts.jsonl --out embeds.pt
+python -m inference.decode --checkpoint latent-context/0.6b-4b-LCLM-16x \
+    --embeds-pt embeds.pt --out completions.jsonl
+
+# 4. End-to-end RULER NIAH eval
+python -m inference.examples.prepare_ruler_niah --ctx 4096 --out-dir _ruler_prompts
+python -m inference.examples.eval_ruler_niah \
+    --checkpoint latent-context/0.6b-4b-LCLM-16x \
+    --prompts-dir _ruler_prompts --out-dir _ruler_results
 ```
 
-## Repo layout
-
-| Path              | What it is |
-| ----------------- | ---------- |
-| `latent_context/` | Model package — `LCLM`, `LatentEncoder`, `Adapter`, `LCLMProcessor`, `from_pretrained`. Legacy class names (`LCLM`, `Encoder`, `Adapter`) are also exported for backward compat with already-published checkpoints. |
-| `train/`          | `launch_train.py` (CLI) + `trainer.py` (training loop, checkpointing, auto-resume). |
-| `scripts/`        | Launch wrappers (`train.sh`, `run_pipeline.sh`, `convert_checkpoint.sh`) + YAML configs (`experiment_config/`, `pretrain_config/`, `distributed_configs/`). |
-| `inference/`      | `hf.py` (reference) + `vllm.py` (production) + `examples/`. |
-| `agent/`          | Agent app — `EXPAND(i)` tool over compressed segments. Per-benchmark runners + Modal launcher. |
-| `data/`           | Training-time datasets, collators, dynamic packing utilities. |
-| `utils/`          | Generic helpers (env, seed, scheduler, NaN checks) + `utils/checkpoints/` shell scripts for converting FSDP/DeepSpeed checkpoints to the HF layout. |
+Text to compress should be wrapped between `<|memory_start|>` and
+`<|memory_end|>` in the prompt. Scoring uses the official RULER scorer
+(case-insensitive substring match per needle).
 
 ## Training
 
-End-to-end pipeline (adapter → encoder → decoder → SFT) via accelerate/DeepSpeed:
+End-to-end pipeline (adapter → encoder → decoder → SFT) via
+accelerate / DeepSpeed:
 
 ```bash
 OUTPUT_DIR=./checkpoints bash scripts/run_pipeline.sh \
-  scripts/experiment_config/0.6b-4b-cs16-mean-w1024-bidirectional-mlp-O0.yaml
+    scripts/experiment_config/0.6b-4b-cs16-mean-w1024-bidirectional-mlp-O0.yaml
 ```
 
 For FSDP, swap to a `*-fsdp.yaml` distributed config (or set
@@ -100,13 +105,13 @@ Key env vars:
 |-----|---------|--------------|
 | `OUTPUT_DIR` | (required) | Where checkpoints get written. |
 | `AUTO_RESUME` | `true` | Resume from latest matching checkpoint each `SAVE_STEPS`. |
-| `RESUME_FROM_CHECKPOINT` | `""` | Resume from a specific HF checkpoint (lower priority than `AUTO_RESUME`). |
+| `RESUME_FROM_CHECKPOINT` | `""` | Resume from a specific HF checkpoint. |
 | `DISTRIBUTED_TYPE` | `deepspeed` | `deepspeed` or `fsdp`. |
 | `DIST_TRAIN_CONFIG` | `scripts/distributed_configs/deepspeed_zero1_multi_node.yaml` | Accelerate config path. |
 
 See `train/trainer.py` for the checkpoint / resume logic and
-`utils/checkpoints/` for converting raw distributed checkpoints to
-HF-style ones the loader can read.
+`utils/checkpoints/` for converting raw distributed checkpoints to the
+HF-style layout the loader expects.
 
 ## Citation
 

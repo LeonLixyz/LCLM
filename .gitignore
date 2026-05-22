@@ -260,3 +260,6 @@ benchmark/new_outputs/
 
 # Local secrets / runtime
 .env
+
+# Modal orchestration (local-only, not part of public repo)
+_modal_run/
