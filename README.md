@@ -63,8 +63,7 @@ model = LCLM.from_pretrained("latent-context/0.6b-4b-LCLM-16x")
 #### vLLM inference
 
 Two-stage CLI — HF encoder and vLLM decoder run in **separate
-processes** that hand off via a `.pt` file. Running both in one process
-OOMs (vLLM grabs all GPU memory at init).
+processes** that hand off via a `.pt` file.
 
 ```bash
 python -m inference.vllm_inference.encode \
