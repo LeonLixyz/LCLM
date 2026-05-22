@@ -5,8 +5,7 @@ encoder–decoder soft-token compressor: an encoder maps a long input to
 a short sequence of latent tokens, and a decoder consumes those latents
 in place of the original tokens.
 
-Trained checkpoints: [`latent-context/0.6b-4b-LCLM-{4,8,16}x`](https://huggingface.co/latent-context).
-Eval datasets: [`latent-context/lclm-eval`](https://huggingface.co/datasets/latent-context/lclm-eval).
+🤗 [Checkpoints](https://huggingface.co/latent-context) · [Eval datasets](https://huggingface.co/datasets/latent-context/lclm-eval)
 
 ## Install
 
