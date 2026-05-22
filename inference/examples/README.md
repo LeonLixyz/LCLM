@@ -21,24 +21,12 @@ python -m inference.examples.example_hf \
     --prompt "<|memory_start|>$(cat my_doc.txt)<|memory_end|> Summarize."
 ```
 
-## 2. One-shot vLLM generation
+## 2. Two-stage encode → decode (vLLM)
 
-Same idea but through vLLM (`inference/vllm.py`) — uses the HF encoder
-once to produce latent tokens, then vLLM with `enable_prompt_embeds=True`
-for fast batched decoding.
-
-```bash
-python -m inference.examples.example_vllm \
-    --checkpoint latent-context/0.6b-4b-LCLM-16x \
-    --prompt "<|memory_start|>$(cat my_doc.txt)<|memory_end|> Summarize." \
-    --tensor-parallel-size 2
-```
-
-## 3. Two-stage encode → decode
-
-For larger eval sweeps, split into two processes (encode in an HF
-process, decode in a vLLM process) so each side gets a clean GPU
-budget. Inputs/outputs are passed via a `.pt` file on disk.
+The vLLM path runs the encoder and the decoder in **separate processes**
+that hand off via a `.pt` file on disk. Running both in one process
+OOMs — vLLM grabs all available GPU memory at init, leaving none for
+the HF encoder.
 
 ```bash
 # Step 1: HF encoder over a jsonl of prompts → embeds.pt
@@ -66,7 +54,7 @@ fields are passed through as metadata.
 {"prompt": [{"role": "user", "content": "<|memory_start|>...<|memory_end|> Question?"}], "answers": ["expected answer"]}
 ```
 
-## 4. RULER NIAH evaluation
+## 3. RULER NIAH evaluation
 
 End-to-end RULER needle-in-a-haystack eval over the published
 `latent-context/lclm-eval` dataset.

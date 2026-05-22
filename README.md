@@ -53,28 +53,22 @@ All four entry points are documented in
 pointers:
 
 ```python
-# 1. One-shot via HuggingFace Transformers
+# 1. One-shot via HuggingFace Transformers (single process, single GPU)
 from latent_context import LCLM
 model = LCLM.from_pretrained("latent-context/0.6b-4b-LCLM-16x")
 # see inference/hf.py for generate_text
-
-# 2. One-shot via vLLM (HF encoder + vLLM decoder)
-from inference.vllm import LCLMVLLMDecoder
-runner = LCLMVLLMDecoder("latent-context/0.6b-4b-LCLM-16x", tensor_parallel_size=2)
-outputs = runner.generate(
-    prompts=[[{"role": "user", "content": "<|memory_start|>...<|memory_end|> Summarize."}]],
-    max_tokens=512, temperature=0.0,
-)
 ```
 
 ```bash
-# 3. Two-stage CLI (encode-once, decode-many — good for large sweeps)
+# 2. Two-stage CLI via vLLM (HF encoder + vLLM decoder in separate
+#    processes — this is the path for batched eval / serving). Running
+#    both in one process OOMs: vLLM grabs all GPU memory at init.
 python -m inference.encode --checkpoint latent-context/0.6b-4b-LCLM-16x \
     --prompts-jsonl prompts.jsonl --out embeds.pt
 python -m inference.decode --checkpoint latent-context/0.6b-4b-LCLM-16x \
     --embeds-pt embeds.pt --out completions.jsonl
 
-# 4. End-to-end RULER NIAH eval
+# 3. End-to-end RULER NIAH eval (wraps the two-stage CLI + scoring)
 python -m inference.examples.prepare_ruler_niah --ctx 4096 --out-dir _ruler_prompts
 python -m inference.examples.eval_ruler_niah \
     --checkpoint latent-context/0.6b-4b-LCLM-16x \
