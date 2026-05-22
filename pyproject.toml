@@ -46,8 +46,7 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = [
-  "debug_gpu", "eval", "inference", "model",
-  "scripts", "train", "utils", "vllm_inference", "test"
+  "inference", "latent_context", "train", "utils"
 ]
 
 [tool.uv]
