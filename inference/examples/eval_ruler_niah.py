@@ -4,7 +4,7 @@ ruler_string_match_all (lowercase substring containment).
 
 The prompts.jsonl files are expected to be ``{"prompt": ..., "answers": [...]}``
 per line — see ``inference.examples.prepare_ruler_niah`` for one way to
-materialize them from the ``latent-context/ruler-full`` dataset.
+materialize them from the ``latent-context/lclm-eval (config="ruler")`` dataset.
 
 Encode and decode run as separate Python processes so vLLM (which fills
 the whole GPU for its KV cache) never has to share device memory with

@@ -1,4 +1,4 @@
-"""Prepare RULER NIAH prompts.jsonl files from latent-context/ruler-full.
+"""Prepare RULER NIAH prompts.jsonl files from latent-context/lclm-eval.
 
 Writes one JSONL per NIAH subtask into ``--out-dir``. Each line is a
 record ``{"prompt": "<chat-templated str>", "answers": ["..."]}`` ready
@@ -36,8 +36,8 @@ def main():
     tasks = [t.strip() for t in args.tasks.split(",") if t.strip()]
     out = Path(args.out_dir); out.mkdir(parents=True, exist_ok=True)
 
-    ds = load_dataset("latent-context/ruler-full", "memwrap")
-    rows = ds[list(ds.keys())[0]]
+    ds = load_dataset("latent-context/lclm-eval", "ruler", split="test")
+    rows = ds
     print(f"Loaded {len(rows)} memwrap rows", flush=True)
 
     for task in tasks:

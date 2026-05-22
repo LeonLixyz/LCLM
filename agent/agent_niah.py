@@ -64,7 +64,7 @@ DEFAULT_MAX_ROUNDS = 5
 # agent can chunk + memwrap on its own. The "llama-3.2-tokenizer" suffix only
 # means upstream sized the haystack to fit 4096/8192/... llama tokens; we
 # retokenize with Qwen at runtime, so the effective Qwen-token count drifts by
-# ~5% from the standard run_eval baseline (which uses latent-context/ruler-full —
+# ~5% from the standard run_eval baseline (which uses latent-context/lclm-eval (config="ruler") —
 # Qwen-resized — but only ships chat-templated prompts, not raw text).
 DATASET_FOR_CTX = {
     4096: "SaylorTwift/RULER-4096-llama-3.2-tokenizer",

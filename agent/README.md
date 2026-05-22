@@ -59,5 +59,5 @@ Results land under `/vol/<MODEL_SHORT>_results/agent/niah/...` on the
 raw RULER text (`input` + `outputs` columns). Upstream sized those haystacks to
 fit `ctx` llama tokens; we retokenize at runtime with the Qwen encoder, so the
 effective Qwen-token count drifts by ~5% from the standard `run_eval` baseline
-(which uses `latent-context/ruler-full` — Qwen-resized — but only ships
+(which uses `latent-context/lclm-eval (config="ruler")` — Qwen-resized — but only ships
 chat-templated prompts, not raw text the agent can chunk).
