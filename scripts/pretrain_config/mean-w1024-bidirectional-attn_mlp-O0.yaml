@@ -1,0 +1,68 @@
+experiment: auto
+
+models:
+  encoder: Qwen/Qwen3-Embedding-0.6B
+  decoder: Qwen/Qwen3-0.6B
+  pooling: mean
+  adapter_type: attn_mlp
+  encoder_window_size: 1024
+  mask: bidirectional
+  decoder_attn_implementation: flash_attention_2
+  embed_attn_implementation: flash_attention_2
+  boundary_overlap: 0
+  random_init_decoder: true
+  random_init_encoder: true
+
+training:
+  compression_ratio: 16
+  max_encode_batch_size: 1024
+  gradient_accumulation_steps: 1
+  num_epochs: 1
+  max_steps: 10000
+  warmup_steps: 500
+  max_grad_norm: 1.0
+  save_steps: 500
+  delete_old_checkpoints: true
+  seed: 4231
+  auto_resume: true
+  preempt_save_minutes: 5
+  optimizer: adamw
+  scheduler: cosine
+  adam_epsilon: 1.0e-8
+  decoder_betas: "0.9,0.95"
+  encoder_betas: "0.9,0.95"
+  adapter_betas: "0.9,0.95"
+  decoder_gradient_checkpointing: true
+  use_liger_kernel: true
+
+data:
+  num_workers: 4
+  use_packing: true
+  use_memory_wrapping: true
+  packed_attention_backend: flash
+  train_wrap_tokens: true
+
+logging:
+  wandb_project: compression-pretrain-scratch
+  wandb_name: auto
+  log_interval: 10
+  log_token_counts: true
+
+stages:
+  0:
+    train_batch_size: 1
+    warmup_steps: 500
+    train_decoder: true
+    train_encoder: true
+    adapter_lr: 1.0e-3
+    encoder_lr: 3.0e-4
+    decoder_lr: 3.0e-4
+    min_lr: 3.0e-5
+    decoder_weight_decay: 0.1
+    encoder_weight_decay: 0.1
+    adapter_weight_decay: 0.01
+    encoder_gradient_checkpointing: true
+    dataset: ./data/packed_batches/stage2-16384
+    distributed:
+      type: deepspeed
+      config: ./scripts/distributed_configs/deepspeed_zero2_multi_node.yaml

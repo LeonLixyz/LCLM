@@ -1,0 +1,16 @@
+torch
+transformers>=4,<5
+accelerate
+peft
+deepspeed
+datasets
+numpy
+tqdm
+wandb
+liger-kernel
+matplotlib
+seaborn
+openai
+python-dotenv
+pyarrow
+torchdata
