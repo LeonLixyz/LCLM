@@ -62,8 +62,9 @@ model = LCLM.from_pretrained("latent-context/0.6b-4b-LCLM-16x")
 
 #### vLLM inference
 
-Two-stage CLI — HF encoder and vLLM decoder run in **separate
-processes** that hand off via a `.pt` file.
+Two stages: first the HF encoder compresses every prompt into latent
+tokens written to a `.pt` file, then vLLM reads that file and decodes
+generations from the latents.
 
 ```bash
 python -m inference.vllm_inference.encode \
