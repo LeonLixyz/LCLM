@@ -47,36 +47,33 @@ LCLM/
 
 ## Inference
 
-All four entry points are documented in
-[`inference/examples/README.md`](inference/examples/README.md). Quick
-pointers:
+Text to compress should be wrapped between `<|memory_start|>` and
+`<|memory_end|>` in the prompt. See
+[`inference/examples/README.md`](inference/examples/README.md) for
+runnable demos and the RULER NIAH eval driver.
+
+#### HF inference
 
 ```python
-# 1. One-shot via HuggingFace Transformers (single process, single GPU)
 from latent_context import LCLM
 model = LCLM.from_pretrained("latent-context/0.6b-4b-LCLM-16x")
 # see inference/hf.py for generate_text
 ```
 
+#### vLLM inference
+
+Two-stage CLI — HF encoder and vLLM decoder run in **separate
+processes** that hand off via a `.pt` file. Running both in one process
+OOMs (vLLM grabs all GPU memory at init).
+
 ```bash
-# 2. Two-stage CLI via vLLM (HF encoder + vLLM decoder in separate
-#    processes — this is the path for batched eval / serving). Running
-#    both in one process OOMs: vLLM grabs all GPU memory at init.
-python -m inference.vllm_inference.encode --checkpoint latent-context/0.6b-4b-LCLM-16x \
-    --prompts-jsonl prompts.jsonl --out embeds.pt
-python -m inference.vllm_inference.decode --checkpoint latent-context/0.6b-4b-LCLM-16x \
-    --embeds-pt embeds.pt --out completions.jsonl
-
-# 3. End-to-end RULER NIAH eval (wraps the two-stage CLI + scoring)
-python -m inference.examples.prepare_ruler_niah --ctx 4096 --out-dir _ruler_prompts
-python -m inference.examples.eval_ruler_niah \
+python -m inference.vllm_inference.encode \
     --checkpoint latent-context/0.6b-4b-LCLM-16x \
-    --prompts-dir _ruler_prompts --out-dir _ruler_results
+    --prompts-jsonl prompts.jsonl --out embeds.pt
+python -m inference.vllm_inference.decode \
+    --checkpoint latent-context/0.6b-4b-LCLM-16x \
+    --embeds-pt embeds.pt --out completions.jsonl
 ```
-
-Text to compress should be wrapped between `<|memory_start|>` and
-`<|memory_end|>` in the prompt. Scoring uses the official RULER scorer
-(case-insensitive substring match per needle).
 
 ## Training
 
