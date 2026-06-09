@@ -1,0 +1,132 @@
+experiment: auto  # auto-generated: {encoder}-{decoder}-cs{compression_ratio}-w{encoder_window_size}-{pooling}
+
+models:
+  encoder: Qwen/Qwen3-Embedding-0.6B
+  decoder: Qwen/Qwen3-4B-Instruct-2507
+  pooling: mean  # mean, eos, concat
+  adapter_type: mlp
+  encoder_window_size: 1024  # Max tokens per batch for the encoder window size (multiple of compression_ratio; default 1024)
+  mask: causal # causal, bidirectional
+  decoder_attn_implementation: flash_attention_2  # sdpa, flash_attention_2, flex_attention, eager
+  embed_attn_implementation: flash_attention_2  # Embedder no packed attention
+  boundary_overlap: 0  # Overlap context for tiled processing (default: 0)
+
+training:
+  compression_ratio: 8
+  max_encode_batch_size: 1024
+  gradient_accumulation_steps: 1
+  num_epochs: 1
+  warmup_steps: 500
+  max_grad_norm: 1.0
+  save_steps: 100
+  delete_old_checkpoints: true  # If false, keep all checkpoints
+  seed: 4231
+  auto_resume: true
+
+  # SLURM preemption checkpoint: save checkpoint before job ends (queries SLURM for remaining time)
+  preempt_save_minutes: 5  # Save checkpoint this many minutes before job ends (0 to disable)
+
+  optimizer: adamw
+  scheduler: cosine
+  adam_epsilon: 1.0e-8
+
+  # Betas
+  decoder_betas: "0.9,0.95"
+  encoder_betas: "0.9,0.95"
+  adapter_betas: "0.9,0.95"
+
+  # Gradient checkpointing
+  decoder_gradient_checkpointing: true
+  use_liger_kernel: true
+
+data:
+  num_workers: 4
+  use_packing: true
+  use_memory_wrapping: true
+  packed_attention_backend: flash
+  train_wrap_tokens: true
+
+# output.dir: Set via OUTPUT_DIR env var (default: ./checkpoints)
+
+logging:
+  wandb_project: compression-training-prod
+  wandb_name: auto  # "auto" uses experiment name, or specify custom name. _stage_N is always appended.
+  log_interval: 10  # Print training progress every N gradient steps (1 = every step)
+  log_token_counts: true  # Log token counts (before/after compression) and tokens/sec throughput
+
+# Stage-specific overrides
+# resume_from_checkpoint is computed automatically: stage N loads from stage N-1's HF checkpoint
+# You can override with per-stage: resume_from_checkpoint: /path/to/checkpoint-hf
+# warmup_steps can also be per-stage (falls back to training.warmup_steps if not specified)
+stages:
+  0:  # Adapter only
+    train_batch_size: 1
+    warmup_steps: 250
+    train_decoder: false
+    train_encoder: false
+    adapter_lr: 1.0e-3
+    encoder_lr: 6.0e-5
+    decoder_lr: 6.0e-5
+    min_lr: 1.0e-6
+    decoder_weight_decay: 0.0
+    encoder_weight_decay: 0.0
+    adapter_weight_decay: 0.01
+    encoder_gradient_checkpointing: false
+    dataset: ./data/packed_batches/stage0-16384
+    distributed:
+      type: deepspeed
+      config: ./scripts/distributed_configs/deepspeed_zero2_multi_node.yaml
+
+  1:  # Embedder
+    train_batch_size: 1
+    warmup_steps: 500
+    train_decoder: false
+    train_encoder: true
+    adapter_lr: 6.0e-5
+    encoder_lr: 6.0e-5
+    decoder_lr: 6.0e-5
+    min_lr: 1.0e-6
+    decoder_weight_decay: 0.0
+    encoder_weight_decay: 0.01
+    adapter_weight_decay: 0.01
+    encoder_gradient_checkpointing: true
+    dataset: ./data/packed_batches/stage1-16384
+    distributed:
+      type: deepspeed
+      config: ./scripts/distributed_configs/deepspeed_zero2_multi_node.yaml
+
+  2:  # LLM
+    train_batch_size: 1
+    warmup_steps: 1000
+    train_decoder: true
+    train_encoder: true
+    adapter_lr: 6.0e-5
+    encoder_lr: 6.0e-5
+    decoder_lr: 1.0e-5
+    min_lr: 1.0e-6
+    decoder_weight_decay: 0.0
+    encoder_weight_decay: 0.01
+    adapter_weight_decay: 0.01
+    encoder_gradient_checkpointing: true
+    dataset: ./data/packed_batches/stage2-16384
+    distributed:
+      type: deepspeed
+      config: ./scripts/distributed_configs/deepspeed_zero2_multi_node.yaml
+
+  3:  # Final
+    train_batch_size: 1
+    warmup_steps: 500
+    train_decoder: true
+    train_encoder: true
+    adapter_lr: 3.0e-5
+    encoder_lr: 3.0e-5
+    decoder_lr: 3.0e-5
+    min_lr: 1.0e-6
+    decoder_weight_decay: 0.0
+    encoder_weight_decay: 0.01
+    adapter_weight_decay: 0.01
+    encoder_gradient_checkpointing: true
+    dataset: ./data/packed_batches/stage3-16384
+    distributed:
+      type: deepspeed
+      config: ./scripts/distributed_configs/deepspeed_zero2_multi_node.yaml
