@@ -44,16 +44,20 @@ def test_generation_is_deterministic_and_uses_only_positional_segment_ids():
         assert all(segment_id.startswith("seg_") for segment_id in task["support_segment_ids"])
 
 
-def test_initial_context_contains_compressed_segments_but_not_original_text():
+def test_training_context_contains_full_long_segments_and_rollout_sees_only_summaries():
     task = generate_task(0, seed=8, distractors=5)
 
     assert task["user_prompt"].count(MEMORY_START) == len(task["segments"])
     assert task["user_prompt"].count(MEMORY_END) == len(task["segments"])
+    assert MEMORY_START not in task["rollout_user_prompt"]
+    assert MEMORY_END not in task["rollout_user_prompt"]
     for segment in task["segments"]:
-        assert f"{segment['segment_id']}\n{MEMORY_START}{segment['summary']}{MEMORY_END}" in task[
+        assert f"{segment['segment_id']}\n{MEMORY_START}{segment['text']}{MEMORY_END}" in task[
             "user_prompt"
         ]
-        assert segment["text"] not in task["user_prompt"]
+        assert len(segment["text"].split()) >= 512
+        assert segment["summary"] in task["rollout_user_prompt"]
+        assert segment["text"] not in task["rollout_user_prompt"]
 
 
 def test_memory_markers_exist_only_in_the_initial_user_context():
@@ -84,18 +88,25 @@ def test_expand_returns_original_text_for_exact_seg_i():
 
 def test_native_rollout_expands_all_support_then_answers():
     task = generate_task(2, seed=10, distractors=4, family="multi_key_lookup")
+    seen_prompts = []
     responses = []
     for index, segment_id in enumerate(task["support_segment_ids"]):
         responses.append(_expand_call(f"call-{index}", segment_id))
     responses.append({"content": task["expected_final"], "tool_calls": []})
     scripted = iter(responses)
 
-    trace = run_agent_rollout(task, lambda _messages, _tools: next(scripted))
+    def complete(messages, _tools):
+        seen_prompts.append(messages[1]["content"])
+        return next(scripted)
+
+    trace = run_agent_rollout(task, complete)
 
     assert trace["verification"]["accepted"]
     assert trace["compression_scope"] == "input_segments"
-    assert trace["tool_call_count"] == 3
+    assert trace["tool_call_count"] == len(task["support_segment_ids"])
     assert trace["tools"] == [EXPAND_TOOL]
+    assert all(prompt == task["rollout_user_prompt"] for prompt in seen_prompts)
+    assert trace["messages"][1]["content"] == task["training_user_prompt"]
     tool_results = [message for message in trace["messages"] if message["role"] == "tool"]
     assert [message["content"] for message in tool_results] == [
         expand(task, segment_id) for segment_id in task["support_segment_ids"]
@@ -130,7 +141,7 @@ def test_parallel_native_expand_calls_are_all_executed_and_preserved():
         message for message in trace["messages"] if message["role"] == "assistant" and message.get("tool_calls")
     ]
     assert assistant_calls[0]["tool_calls"] == calls
-    assert len([message for message in trace["messages"] if message["role"] == "tool"]) == 2
+    assert len([message for message in trace["messages"] if message["role"] == "tool"]) == len(calls)
 
 
 def test_answer_without_expansion_is_rejected():
@@ -202,12 +213,13 @@ def test_harvest_replays_verification_and_deduplicates_runs(tmp_path):
     task = generate_task(0, seed=15, distractors=2)
 
     def make_trace():
-        scripted = iter(
-            [
-                _expand_call("call-1", task["support_segment_ids"][0]),
-                {"content": task["expected_final"], "tool_calls": []},
-            ]
-        )
+        scripted = iter([
+            *[
+                _expand_call(f"call-{index}", segment_id)
+                for index, segment_id in enumerate(task["support_segment_ids"])
+            ],
+            {"content": task["expected_final"], "tool_calls": []},
+        ])
         return run_agent_rollout(task, lambda _messages, _tools: next(scripted))
 
     for name in ("run-a", "run-b"):
@@ -221,4 +233,4 @@ def test_harvest_replays_verification_and_deduplicates_runs(tmp_path):
     assert len(harvested) == 1
     assert report["duplicates_removed"] == 1
     assert report["harvested"] == 1
-    assert report["tool_calls"] == 1
+    assert report["tool_calls"] == len(task["support_segment_ids"])

@@ -15,19 +15,19 @@ import modal
 APP_NAME = "lclm-upload-synthetic-expansion-pilot"
 VOLUME_NAME = "lclm-stage3-data"
 SOURCE_DIR = Path(
-    "/data/stage3-agent/synthetic-expansion/pilot-seg-20260820-v2"
+    "/data/stage3-agent/synthetic-expansion/pilot-long-seg-20260821-v1"
 )
 HARVEST_DIR = Path(
-    "/data/stage3-agent/synthetic-expansion/harvest-pilot-seg-20260820-v2"
+    "/data/stage3-agent/synthetic-expansion/harvest-pilot-long-seg-20260821-v1"
 )
 REPORT_PATH = Path(
-    "/data/stage3-agent/synthetic-expansion/hf-upload-pilot-seg-20260820-v2.json"
+    "/data/stage3-agent/synthetic-expansion/hf-upload-pilot-long-seg-20260821-v1.json"
 )
 REPO_ID = "leonli66/stage3-synthetic-expansion-agent"
 
-EXPECTED_ACCEPTED = 4
-EXPECTED_REJECTED = 1
-EXPECTED_TOOL_CALLS = 9
+EXPECTED_ACCEPTED = 3
+EXPECTED_REJECTED = 2
+EXPECTED_TOOL_CALLS = 11
 
 PROJECT_ROOT = Path("/opt/lclm")
 image = (
@@ -62,24 +62,28 @@ configs:
 This is a small inspection pilot for native selective-expansion training. It is
 not the final-scale mixture.
 
-Each initial user context contains positional segments named `seg_1`, `seg_2`,
-and so on. Every visible segment body is wrapped in
+Each initial user context contains 27–29 positional segments named `seg_1`,
+`seg_2`, and so on. Every segment contains its full source document wrapped in
 `<|memory_start|>...<|memory_end|>`. The assistant receives a native Qwen tool
 schema and may call `expand({"segment_id": "seg_i"})`; the matching tool result
-then places that segment's original text into the conversation.
+then places that same full document into the conversation. The Qwen teacher saw
+only short routing descriptions while generating calls; those descriptions are
+not stored as the train-time memory bodies.
 
 ## Pilot results
 
 - Requested tasks: 5, one per task family
-- Verified accepted traces: 4
-- Native expansion calls: 9
-- Rejected traces: 1 (correct answer with extra prose despite an exact-format requirement)
+- Verified accepted traces: 3
+- Native expansion calls: 11 (3–5 per trace)
+- Rejected traces: 2 (wrong exact final answers)
 - Model: `Qwen/Qwen3-235B-A22B-Instruct-2507`
 - Compression scope: initial input segments only
+- Per-segment floor: 512 whitespace-delimited words (882–972 Qwen tokens here)
+- Raw memory context: 25,627–27,328 Qwen tokens per accepted trace
 
-The accepted split contains one multi-key lookup, one numeric comparison, one
-set intersection, and one two-hop join. The audit directory retains all five
-programmatic tasks and the rejected trace.
+The accepted split contains one latest-state task, one multi-key lookup, and one
+multi-hop join. The audit directory retains all five programmatic tasks and both
+rejected traces.
 
 ## Training semantics
 
@@ -177,7 +181,8 @@ def upload() -> dict[str, object]:
             repo_type="dataset",
             folder_path=upload_root,
             ignore_patterns=["state.json", "**/state.json", "**/.cache/**"],
-            commit_message="Publish verified seg_i expansion-agent pilot",
+            delete_patterns=["audit/*"],
+            commit_message="Replace pilot with long-document expansion traces",
         )
 
     expected_files = {

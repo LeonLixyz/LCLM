@@ -9,7 +9,7 @@ supporting segment and emit the exact final answer are harvested.
 Pilot example:
 
     modal run --detach data/generate_synthetic_expansion_modal.py \
-        --count 25 --run-name pilot-seg-v1
+        --count 25 --run-name pilot-long-seg-v2
 """
 
 from __future__ import annotations
@@ -271,7 +271,7 @@ class QwenExpansionAgentGenerator:
 
         tasks = generate_tasks(count, seed=seed, distractors=distractors)
         manifest = {
-            "schema_version": 1,
+            "schema_version": 2,
             "run_name": run_name,
             "count": count,
             "seed": seed,
@@ -361,9 +361,9 @@ class QwenExpansionAgentGenerator:
                 }
             except Exception as exc:
                 trace = {
-                    "schema_version": 1,
+                    "schema_version": 2,
                     "data_type": "synthetic_expansion_agent",
-                    "source_dataset": "synthetic-expansion-v1",
+                    "source_dataset": "synthetic-expansion-v2",
                     "sub_dataset": task["family"],
                     "task_id": task["task_id"],
                     "task": task["question"],
@@ -438,7 +438,7 @@ def main(
     count: int = 25,
     seed: int = 20260818,
     distractors: int = 48,
-    run_name: str = "pilot-seg-v1",
+    run_name: str = "pilot-long-seg-v2",
     max_tool_calls: int = 6,
     temperature: float = 0.1,
 ) -> None:

@@ -24,10 +24,11 @@ MEMORY_START = "<|memory_start|>"
 MEMORY_END = "<|memory_end|>"
 MEMORY_MARKERS = (MEMORY_START, MEMORY_END, "<|memory|>")
 
-SCHEMA_VERSION = 1
-GENERATOR_VERSION = "synthetic-expansion-v1"
+SCHEMA_VERSION = 2
+GENERATOR_VERSION = "synthetic-expansion-v2"
 DEFAULT_DISTRACTORS = 32
 DEFAULT_MAX_TOOL_CALLS = 8
+MIN_SEGMENT_WORDS = 512
 
 TASK_FAMILIES = (
     "latest_state",
@@ -62,12 +63,12 @@ EXPAND_TOOL = {
 }
 
 SYSTEM_PROMPT = """Answer the question using the supplied context segments.
-Each segment is named seg_i and initially contains a compressed summary rather
-than its original document. When exact information is missing, call the expand
-tool with the required segment_id to place that segment's original text into
-the conversation. Expand every segment needed for the answer, and do not guess
-omitted facts. You may make multiple tool calls. Do not expose hidden reasoning.
-Finish with exactly the requested FINAL line.
+Each segment is named seg_i and initially appears through a compressed memory
+representation rather than as ordinary plaintext. When exact information is
+missing, call the expand tool with the required segment_id to place that
+segment's original text into the conversation. Expand every segment needed for
+the answer, and do not guess omitted facts. You may make multiple tool calls.
+Do not expose hidden reasoning. Finish with exactly the requested FINAL line.
 """
 
 _NAMESPACE = uuid.UUID("5c8f153b-180d-55ad-8ba8-0ef20c37f03a")
@@ -121,11 +122,62 @@ def _source(record_id: str, summary: str, text: str) -> dict[str, str]:
     return {"record_id": record_id, "summary": summary, "text": text}
 
 
-def _operational_tail(rng: random.Random) -> str:
-    return (
-        f"The record was reviewed by desk {rng.randrange(1, 18)}. "
-        f"Its retention class is {rng.choice(('standard', 'extended', 'priority'))}."
+def _long_document(rng: random.Random, record_id: str, core_text: str) -> str:
+    """Bury a programmatic fact in a deterministic 512+ token record.
+
+    The lower bound is enforced in whitespace-delimited words. Since every word
+    produces at least one decoder token, this guarantees at least 512 tokens
+    without importing a tokenizer into the pure task generator. The pinned Qwen
+    tokenizer is checked separately during pilot validation.
+    """
+
+    desks = (
+        "archive control",
+        "quality assurance",
+        "operations review",
+        "records compliance",
+        "logistics audit",
+        "inventory governance",
     )
+    retention = ("standard", "extended", "priority", "regulated")
+    conditions = (
+        "normal operating conditions",
+        "routine verification conditions",
+        "the scheduled review window",
+        "a controlled reconciliation period",
+    )
+    notes: list[str] = []
+    entry = 1
+    while len(" ".join(notes).split()) < MIN_SEGMENT_WORDS - len(core_text.split()):
+        batch = _code(rng, "BAT")
+        ticket = _code(rng, "TKT")
+        reviewer = rng.randrange(100, 999)
+        cycle = rng.randrange(10, 100)
+        day = rng.randrange(1, 29)
+        notes.append(
+            f"Administrative entry {entry} for {record_id} states that {rng.choice(desks)} "
+            f"reviewed batch {batch} under {rng.choice(conditions)} on day {day} of cycle "
+            f"{cycle}. Reviewer {reviewer} cross-checked ticket {ticket}, confirmed the "
+            f"{rng.choice(retention)} retention class, and recorded no exception that changes "
+            "the authoritative entity facts elsewhere in this document."
+        )
+        entry += 1
+
+    insertion = rng.randrange(1, len(notes))
+    notes.insert(insertion, core_text)
+    text = "\n\n".join(notes)
+    if len(text.split()) < MIN_SEGMENT_WORDS:
+        raise AssertionError("long-document construction missed its word floor")
+    return text
+
+
+def _long_source(
+    rng: random.Random,
+    record_id: str,
+    summary: str,
+    core_text: str,
+) -> dict[str, str]:
+    return _source(record_id, summary, _long_document(rng, record_id, core_text))
 
 
 def _distractor_sources(rng: random.Random, count: int) -> list[dict[str, str]]:
@@ -138,98 +190,123 @@ def _distractor_sources(rng: random.Random, count: int) -> list[dict[str, str]]:
             key = _code(rng, "AST")
             text = (
                 f"The movement ledger for asset {key} records an assignment to Bay "
-                f"{rng.randrange(1, 90)} at {8 + index % 10:02d}:15. {_operational_tail(rng)}"
+                f"{rng.randrange(1, 90)} at {8 + index % 10:02d}:15."
             )
             summary = f"Movement ledger for asset {key}; exact bay and timing details omitted."
         elif kind == 1:
             key = _code(rng, "ORD")
-            text = f"Order {key} currently has status {rng.choice(statuses)}. {_operational_tail(rng)}"
+            text = f"Order {key} currently has status {rng.choice(statuses)}."
             summary = f"Status record for order {key}; exact status omitted."
         elif kind == 2:
             key = _code(rng, "VND")
             text = (
                 f"Vendor {key} is registered in the {rng.choice(regions)} region. "
-                f"The registry was renewed in cycle {rng.randrange(20, 90)}. {_operational_tail(rng)}"
+                f"The registry was renewed in cycle {rng.randrange(20, 90)}."
             )
             summary = f"Registry record for vendor {key}; exact region and registry details omitted."
         elif kind == 3:
             key = _code(rng, "SNS")
             text = (
                 f"Sensor {key} reported {rng.randrange(100, 900)} calibrated units. "
-                f"The reading passed calibration batch {rng.randrange(1000, 9999)}. {_operational_tail(rng)}"
+                f"The reading passed calibration batch {rng.randrange(1000, 9999)}."
             )
             summary = f"Calibrated reading for sensor {key}; exact numeric value omitted."
         else:
             key = _code(rng, "PRJ")
             members = ", ".join(_person(rng) for _ in range(4))
-            text = f"Project {key} roster: {members}. {_operational_tail(rng)}"
+            text = f"Project {key} roster: {members}."
             summary = f"Roster record for project {key}; member names omitted."
-        sources.append(_source(f"d-{index:04d}-{key}", summary, text))
+        record_id = f"d-{index:04d}-{key}"
+        sources.append(_long_source(rng, record_id, summary, text))
     return sources
 
 
 def _latest_state_task(rng: random.Random) -> tuple[str, str, list[dict[str, str]], list[str]]:
     asset = _code(rng, "AST")
-    bays = rng.sample(range(1, 90), 3)
-    record_id = f"state-{asset}"
-    text = (
-        f"At 08:00, asset {asset} was reassigned to Bay {bays[0]}. "
-        f"At 11:00, asset {asset} was reassigned to Bay {bays[1]}. "
-        f"At 15:00, asset {asset} was reassigned to Bay {bays[2]}. "
-        f"The 15:00 entry is the final movement recorded for the day. {_operational_tail(rng)}"
-    )
-    sources = [_source(record_id, f"Movement history for asset {asset}; exact events and bays omitted.", text)]
+    hours = (8, 11, 15)
+    bays = rng.sample(range(1, 90), len(hours))
+    sources: list[dict[str, str]] = []
+    support: list[str] = []
+    for hour, bay in zip(hours, bays):
+        record_id = f"state-{asset}-{hour:02d}00"
+        core = (
+            f"The authoritative movement event at {hour:02d}:00 states that asset "
+            f"{asset} was reassigned to Bay {bay}."
+        )
+        sources.append(
+            _long_source(
+                rng,
+                record_id,
+                f"Movement record for asset {asset} at {hour:02d}:00; exact bay omitted.",
+                core,
+            )
+        )
+        support.append(record_id)
     question = (
-        f"According to the movement records, what is the latest assigned bay for asset {asset}? "
-        "Return exactly `FINAL: Bay N`."
+        f"According to all three movement records, list the bays assigned to asset {asset} "
+        "at 08:00, 11:00, and 15:00 in chronological order, then repeat the latest bay. "
+        "Return exactly `FINAL: Bay A | Bay B | Bay C | LATEST Bay C`."
     )
-    return question, f"Bay {bays[-1]}", sources, [record_id]
+    answer = f"Bay {bays[0]} | Bay {bays[1]} | Bay {bays[2]} | LATEST Bay {bays[2]}"
+    return question, answer, sources, support
 
 
 def _two_hop_join_task(rng: random.Random) -> tuple[str, str, list[dict[str, str]], list[str]]:
     shipment = _code(rng, "SHP")
     vendor = _code(rng, "VND")
+    facility = _code(rng, "FAC")
     region = rng.choice(("Northern", "Southern", "Eastern", "Western", "Central"))
     shipment_id = f"join-shipment-{shipment}"
     vendor_id = f"join-vendor-{vendor}"
+    facility_id = f"join-facility-{facility}"
     sources = [
-        _source(
+        _long_source(
+            rng,
             shipment_id,
             f"Manifest for shipment {shipment}; supplier identity omitted.",
-            f"Shipment {shipment} was supplied by vendor {vendor}. {_operational_tail(rng)}",
+            f"Shipment {shipment} was supplied by vendor {vendor}.",
         ),
-        _source(
+        _long_source(
+            rng,
             vendor_id,
-            f"Registry record for vendor {vendor}; exact region omitted.",
-            f"Vendor {vendor} is registered in the {region} region. {_operational_tail(rng)}",
+            f"Assignment record for vendor {vendor}; facility identity omitted.",
+            f"Vendor {vendor} is assigned to compliance facility {facility}.",
+        ),
+        _long_source(
+            rng,
+            facility_id,
+            f"Registry record for facility {facility}; exact region omitted.",
+            f"Compliance facility {facility} is registered in the {region} region.",
         ),
     ]
     question = (
-        f"In which region is the supplier of shipment {shipment} registered? "
-        "Return exactly `FINAL: REGION`, using the region name from the records."
+        f"In which region is the compliance facility assigned to the supplier of shipment "
+        f"{shipment} registered? Follow the shipment, vendor, and facility records. "
+        "Return exactly `FINAL: REGION`."
     )
-    return question, region, sources, [shipment_id, vendor_id]
+    return question, region, sources, [shipment_id, vendor_id, facility_id]
 
 
 def _multi_key_task(rng: random.Random) -> tuple[str, str, list[dict[str, str]], list[str]]:
     statuses = ("queued", "approved", "delayed", "packed", "cancelled", "released")
-    orders = [_code(rng, "ORD") for _ in range(3)]
-    selected = rng.sample(statuses, 3)
+    orders = [_code(rng, "ORD") for _ in range(5)]
+    selected = [rng.choice(statuses) for _ in orders]
     sources: list[dict[str, str]] = []
     support: list[str] = []
     for order, status in zip(orders, selected):
         record_id = f"order-{order}"
         sources.append(
-            _source(
+            _long_source(
+                rng,
                 record_id,
                 f"Status record for order {order}; exact status omitted.",
-                f"Order {order} currently has status {status}. {_operational_tail(rng)}",
+                f"Order {order} currently has status {status}.",
             )
         )
         support.append(record_id)
     question = (
-        f"Report the statuses of orders {orders[0]}, {orders[1]}, and {orders[2]} in that order. "
-        "Return exactly `FINAL: STATUS1 | STATUS2 | STATUS3`."
+        f"Report the statuses of orders {', '.join(orders)} in that order. "
+        "Return exactly `FINAL: STATUS1 | STATUS2 | STATUS3 | STATUS4 | STATUS5`."
     )
     return question, " | ".join(selected), sources, support
 
@@ -237,40 +314,33 @@ def _multi_key_task(rng: random.Random) -> tuple[str, str, list[dict[str, str]],
 def _numeric_comparison_task(
     rng: random.Random,
 ) -> tuple[str, str, list[dict[str, str]], list[str]]:
-    first = _code(rng, "SNS")
-    second = _code(rng, "SNS")
-    low = rng.randrange(120, 650)
-    difference = rng.randrange(17, 180)
-    if rng.random() < 0.5:
-        values = (low + difference, low)
-        winner = first
-    else:
-        values = (low, low + difference)
-        winner = second
-    first_id = f"sensor-{first}"
-    second_id = f"sensor-{second}"
-    sources = [
-        _source(
-            first_id,
-            f"Calibrated reading for sensor {first}; exact numeric value omitted.",
-            f"Sensor {first} reported {values[0]} calibrated units. {_operational_tail(rng)}",
-        ),
-        _source(
-            second_id,
-            f"Calibrated reading for sensor {second}; exact numeric value omitted.",
-            f"Sensor {second} reported {values[1]} calibrated units. {_operational_tail(rng)}",
-        ),
-    ]
+    sensors = [_code(rng, "SNS") for _ in range(4)]
+    values = rng.sample(range(120, 900), len(sensors))
+    winner_index = max(range(len(values)), key=values.__getitem__)
+    difference = max(values) - min(values)
+    sources: list[dict[str, str]] = []
+    support: list[str] = []
+    for sensor, value in zip(sensors, values):
+        record_id = f"sensor-{sensor}"
+        sources.append(
+            _long_source(
+                rng,
+                record_id,
+                f"Calibrated reading for sensor {sensor}; exact numeric value omitted.",
+                f"Sensor {sensor} reported {value} calibrated units.",
+            )
+        )
+        support.append(record_id)
     question = (
-        f"Which sensor reported the larger value, {first} or {second}, and by how many units? "
-        "Return exactly `FINAL: SENSOR_ID | DIFFERENCE`."
+        f"Among sensors {', '.join(sensors)}, which reported the largest value, and what is "
+        "the difference between the largest and smallest readings? "
+        "Return exactly `FINAL: SENSOR_ID | MAX_MINUS_MIN`."
     )
-    return question, f"{winner} | {difference}", sources, [first_id, second_id]
+    return question, f"{sensors[winner_index]} | {difference}", sources, support
 
 
 def _intersection_task(rng: random.Random) -> tuple[str, str, list[dict[str, str]], list[str]]:
-    first_project = _code(rng, "PRJ")
-    second_project = _code(rng, "PRJ")
+    projects = [_code(rng, "PRJ") for _ in range(3)]
     shared = _person(rng)
 
     def unique_people(excluded: set[str]) -> list[str]:
@@ -281,31 +351,33 @@ def _intersection_task(rng: random.Random) -> tuple[str, str, list[dict[str, str
                 people.append(candidate)
         return people
 
-    first_only = unique_people({shared})
-    second_only = unique_people({shared, *first_only})
-    first_members = first_only + [shared]
-    second_members = [shared] + second_only
-    rng.shuffle(first_members)
-    rng.shuffle(second_members)
-    first_id = f"roster-{first_project}"
-    second_id = f"roster-{second_project}"
-    sources = [
-        _source(
-            first_id,
-            f"Roster record for project {first_project}; member names omitted.",
-            f"Project {first_project} roster: {', '.join(first_members)}. {_operational_tail(rng)}",
-        ),
-        _source(
-            second_id,
-            f"Roster record for project {second_project}; member names omitted.",
-            f"Project {second_project} roster: {', '.join(second_members)}. {_operational_tail(rng)}",
-        ),
-    ]
+    used = {shared}
+    rosters: list[list[str]] = []
+    for _ in projects:
+        project_only = unique_people(used)
+        used.update(project_only)
+        members = project_only + [shared]
+        rng.shuffle(members)
+        rosters.append(members)
+    sources: list[dict[str, str]] = []
+    support: list[str] = []
+    for project, members in zip(projects, rosters):
+        record_id = f"roster-{project}"
+        sources.append(
+            _long_source(
+                rng,
+                record_id,
+                f"Roster record for project {project}; member names omitted.",
+                f"Project {project} roster: {', '.join(members)}.",
+            )
+        )
+        support.append(record_id)
     question = (
-        f"Who appears in both the {first_project} and {second_project} project rosters? "
+        f"Who is the only person appearing in all three project rosters: "
+        f"{projects[0]}, {projects[1]}, and {projects[2]}? "
         "Return exactly `FINAL: PERSON NAME`."
     )
-    return question, shared, sources, [first_id, second_id]
+    return question, shared, sources, support
 
 
 _FAMILY_BUILDERS = {
@@ -317,9 +389,23 @@ _FAMILY_BUILDERS = {
 }
 
 
-def format_user_prompt(segments: Sequence[Mapping[str, str]], question: str) -> str:
+def format_training_user_prompt(
+    segments: Sequence[Mapping[str, str]], question: str
+) -> str:
     blocks = [
-        f"{segment['segment_id']}\n{MEMORY_START}{segment['summary']}{MEMORY_END}"
+        f"{segment['segment_id']}\n{MEMORY_START}{segment['text']}{MEMORY_END}"
+        for segment in segments
+    ]
+    return "Context segments:\n\n" + "\n\n".join(blocks) + f"\n\nQuestion:\n{question}"
+
+
+def format_rollout_user_prompt(
+    segments: Sequence[Mapping[str, str]], question: str
+) -> str:
+    """Present the teacher with routing clues, never raw source documents."""
+
+    blocks = [
+        f"{segment['segment_id']}\n[compressed segment]\n{segment['summary']}"
         for segment in segments
     ]
     return "Context segments:\n\n" + "\n\n".join(blocks) + f"\n\nQuestion:\n{question}"
@@ -361,7 +447,9 @@ def generate_task(
         "task_id": task_id,
         "family": selected_family,
         "question": question,
-        "user_prompt": format_user_prompt(segments, question),
+        "user_prompt": format_training_user_prompt(segments, question),
+        "training_user_prompt": format_training_user_prompt(segments, question),
+        "rollout_user_prompt": format_rollout_user_prompt(segments, question),
         "gold_answer": gold_answer,
         "expected_final": f"FINAL: {gold_answer}",
         "support_segment_ids": support_segment_ids,
@@ -544,18 +632,25 @@ def run_agent_rollout(
         raise ValueError("max_tool_calls must be positive")
     messages: list[dict[str, Any]] = [
         {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": task["user_prompt"]},
+        {"role": "user", "content": task["training_user_prompt"]},
+    ]
+    rollout_messages: list[dict[str, Any]] = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": task["rollout_user_prompt"]},
     ]
     tool_call_count = 0
     failure_reason: str | None = None
 
     while True:
         try:
-            assistant = canonicalize_assistant_response(complete(messages, [EXPAND_TOOL]))
+            assistant = canonicalize_assistant_response(
+                complete(rollout_messages, [EXPAND_TOOL])
+            )
         except (TypeError, ValueError) as exc:
             failure_reason = f"invalid_assistant_response:{exc}"
             break
-        messages.append(assistant)
+        messages.append(copy.deepcopy(assistant))
+        rollout_messages.append(copy.deepcopy(assistant))
         calls = assistant.get("tool_calls") or []
         if not calls:
             break
@@ -569,14 +664,14 @@ def run_agent_rollout(
             except (KeyError, ValueError):
                 failure_reason = "unknown_segment"
                 break
-            messages.append(
-                {
-                    "role": "tool",
-                    "tool_call_id": call["id"],
-                    "name": "expand",
-                    "content": original,
-                }
-            )
+            tool_message = {
+                "role": "tool",
+                "tool_call_id": call["id"],
+                "name": "expand",
+                "content": original,
+            }
+            messages.append(copy.deepcopy(tool_message))
+            rollout_messages.append(copy.deepcopy(tool_message))
             tool_call_count += 1
         if failure_reason is not None:
             break

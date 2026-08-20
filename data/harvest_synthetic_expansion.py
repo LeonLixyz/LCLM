@@ -14,6 +14,7 @@ from data.synthetic_expansion_agent import (
     EXPAND_TOOL,
     MEMORY_END,
     MEMORY_START,
+    MIN_SEGMENT_WORDS,
     verify_trace,
 )
 
@@ -85,6 +86,18 @@ def _audit_trace(task: Mapping[str, Any], trace: Mapping[str, Any]) -> None:
         raise ValueError(f"{task_id}: initial context does not contain every compressed segment")
     if messages[1]["content"].count(MEMORY_END) != len(task["segments"]):
         raise ValueError(f"{task_id}: unbalanced initial memory segments")
+    for segment in task["segments"]:
+        segment_id = segment.get("segment_id")
+        text = segment.get("text")
+        if not isinstance(segment_id, str) or not isinstance(text, str):
+            raise ValueError(f"{task_id}: invalid task segment")
+        if len(text.split()) < MIN_SEGMENT_WORDS:
+            raise ValueError(f"{task_id}: {segment_id} is shorter than the word floor")
+        expected_block = f"{segment_id}\n{MEMORY_START}{text}{MEMORY_END}"
+        if expected_block not in messages[1]["content"]:
+            raise ValueError(
+                f"{task_id}: training context does not contain full text for {segment_id}"
+            )
     if call_ids != result_ids:
         raise ValueError(f"{task_id}: tool calls and results do not match in order")
 

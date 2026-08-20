@@ -160,7 +160,11 @@ groups (including AdamW state and weight decay).
 
 Synthetic selective-expansion traces use the same native agent path. Their
 initial user context contains positional `seg_i` blocks whose bodies are wrapped
-in `<|memory_start|>...<|memory_end|>`. The assistant calls the Qwen-native
+in `<|memory_start|>...<|memory_end|>`. Each memory body is the full source
+document (at least 512 words), not a prewritten summary. During synthetic trace
+generation only, the teacher sees short routing descriptions so it cannot answer
+from the raw documents without calling `expand`; harvested training messages
+contain the full source documents. The assistant calls the Qwen-native
 `expand` tool with `{"segment_id": "seg_i"}`, receives that segment's original
 text as a tool result, and may continue expanding before answering. Dynamic
 preprocessing extracts memory bodies from agent message content, retains the
@@ -172,8 +176,8 @@ Generate a five-family Qwen-235B pilot on Modal with:
 ```bash
 modal run --detach data/generate_synthetic_expansion_modal.py \
     --count 5 \
-    --distractors 16 \
-    --run-name pilot-seg-v1
+    --distractors 24 \
+    --run-name pilot-long-seg-v2
 ```
 
 ### FSDP
