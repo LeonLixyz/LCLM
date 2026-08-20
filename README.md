@@ -116,6 +116,66 @@ accelerate launch \
     --output_dir ./checkpoints
 ```
 
+### Stage-3 + agent data
+
+The mixture builder keeps ordinary stage-3 rows unchanged, but for the
+reasoning-heavy `reasoning_data` and `dolci_think` subsets it restores the
+original (uncompressed) prompt and compresses only a safely identified target
+analysis span. The final answer/code suffix remains supervised. Ambiguous CoT
+splits fail closed and stay uncompressed.
+
+OpenThoughts trajectories remain full multi-turn conversations with
+`compression_scope=none`; every assistant turn is supervised through the
+Qwen3-4B-Instruct-2507 chat template. Rows whose `result` records an agent error
+are excluded by default.
+
+```bash
+python data/build_stage3_agent_mixture.py \
+    --agent-repeat 10 \
+    --output ./data/stage3-agent.jsonl.gz
+
+python data/preprocess_for_dynamic_packing.py \
+    --input_path ./data/stage3-agent.jsonl.gz \
+    --output_dir ./data/stage3-agent-packed \
+    --llm_tokenizer Qwen/Qwen3-4B-Instruct-2507 \
+    --embed_tokenizer Qwen/Qwen3-Embedding-0.6B \
+    --reference_chunk_size 16 \
+    --max_packed_length 32768
+```
+
+The default agent source is
+`open-thoughts/OpenThoughts-Agent-SFT-100K`. Add the distinct pre-RL cold-start
+set with `--include-coldstart`; failed traces require the explicit
+`--include-failed-agent-traces` override, and derived summary/answer variants
+require `--include-derived-agent-traces`. Source weights control streaming
+interleave order, row caps control how many examples each source pass
+contributes, and `--agent-repeat` is explicit trajectory upsampling (10 passes
+is roughly a low-single-digit agent share against the full 20.3M-row stage-3
+set).
+
+Packed batches may freely mix compressed and uncompressed sequences. During
+distributed training all ranks still enter encoder/adapter collectives; a
+globally all-uncompressed optimizer step is a true no-op for those parameter
+groups (including AdamW state and weight decay).
+
+Synthetic selective-expansion traces use the same native agent path. Their
+initial user context contains positional `seg_i` blocks whose bodies are wrapped
+in `<|memory_start|>...<|memory_end|>`. The assistant calls the Qwen-native
+`expand` tool with `{"segment_id": "seg_i"}`, receives that segment's original
+text as a tool result, and may continue expanding before answering. Dynamic
+preprocessing extracts memory bodies from agent message content, retains the
+native tool schema and all tool calls, supervises every assistant turn, and
+keeps system/user/tool-result tokens loss-masked.
+
+Generate a five-family Qwen-235B pilot on Modal with:
+
+```bash
+modal run --detach data/generate_synthetic_expansion_modal.py \
+    --count 5 \
+    --distractors 16 \
+    --run-name pilot-seg-v1
+```
+
 ### FSDP
 
 Swap the accelerate config:
