@@ -168,6 +168,7 @@ class RealExpansionGenerator:
         from openai import OpenAI
 
         from data.synthetic_expansion_agent import (
+            TEACHER_SYSTEM_PROMPT,
             messages_for_openai_api,
             run_agent_rollout,
         )
@@ -189,6 +190,8 @@ class RealExpansionGenerator:
             "temperature": temperature,
             "model": MODEL_ID,
             "model_revision": MODEL_REVISION,
+            "teacher_system_prompt": TEACHER_SYSTEM_PROMPT,
+            "teacher_prompt_saved_in_training_messages": False,
         }
         if generation_manifest_path.exists():
             with generation_manifest_path.open() as handle:
@@ -252,6 +255,7 @@ class RealExpansionGenerator:
                         "temperature": temperature,
                         "top_p": 0.95,
                         "max_tokens_per_turn": 768,
+                        "teacher_prompt_saved_in_training_messages": False,
                     },
                 )
             except Exception as exc:

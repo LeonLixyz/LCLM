@@ -44,10 +44,17 @@ def _audit_trace(task: Mapping[str, Any], trace: Mapping[str, Any]) -> None:
         raise ValueError(f"{task_id}: trace is not marked accepted")
 
     messages = trace.get("messages")
-    if not isinstance(messages, list) or len(messages) < 5:
+    if not isinstance(messages, list) or len(messages) < 4:
         raise ValueError(f"{task_id}: incomplete message trajectory")
-    if messages[0].get("role") != "system" or messages[1].get("role") != "user":
-        raise ValueError(f"{task_id}: expected system then user messages")
+    training_system_prompt = task.get("training_system_prompt")
+    user_index = 1 if training_system_prompt else 0
+    if training_system_prompt:
+        if messages[0] != {"role": "system", "content": training_system_prompt}:
+            raise ValueError(f"{task_id}: task system prompt was not preserved exactly")
+    elif messages[0].get("role") == "system":
+        raise ValueError(f"{task_id}: generation-only system prompt leaked into training")
+    if messages[user_index].get("role") != "user":
+        raise ValueError(f"{task_id}: expected initial task user message")
 
     marker_messages: list[int] = []
     call_ids: list[str] = []
@@ -80,11 +87,11 @@ def _audit_trace(task: Mapping[str, Any], trace: Mapping[str, Any]) -> None:
                 raise ValueError(f"{task_id}: non-expand tool result")
             result_ids.append(message.get("tool_call_id"))
 
-    if marker_messages != [1]:
+    if marker_messages != [user_index]:
         raise ValueError(f"{task_id}: memory markers must occur only in the initial user context")
-    if messages[1]["content"].count(MEMORY_START) != len(task["segments"]):
+    if messages[user_index]["content"].count(MEMORY_START) != len(task["segments"]):
         raise ValueError(f"{task_id}: initial context does not contain every compressed segment")
-    if messages[1]["content"].count(MEMORY_END) != len(task["segments"]):
+    if messages[user_index]["content"].count(MEMORY_END) != len(task["segments"]):
         raise ValueError(f"{task_id}: unbalanced initial memory segments")
     for segment in task["segments"]:
         segment_id = segment.get("segment_id")
@@ -94,7 +101,7 @@ def _audit_trace(task: Mapping[str, Any], trace: Mapping[str, Any]) -> None:
         if len(text.split()) < MIN_SEGMENT_WORDS:
             raise ValueError(f"{task_id}: {segment_id} is shorter than the word floor")
         expected_block = f"{segment_id}\n{MEMORY_START}{text}{MEMORY_END}"
-        if expected_block not in messages[1]["content"]:
+        if expected_block not in messages[user_index]["content"]:
             raise ValueError(
                 f"{task_id}: training context does not contain full text for {segment_id}"
             )

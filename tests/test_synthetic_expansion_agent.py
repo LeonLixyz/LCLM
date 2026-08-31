@@ -76,7 +76,9 @@ def test_memory_markers_exist_only_in_the_initial_user_context():
         for message in trace["messages"]
         if MEMORY_START in message.get("content", "") or MEMORY_END in message.get("content", "")
     ]
-    assert marker_messages == [trace["messages"][1]]
+    assert marker_messages == [trace["messages"][0]]
+    assert trace["messages"][0]["role"] == "user"
+    assert not any(message["role"] == "system" for message in trace["messages"])
 
 
 def test_expand_returns_original_text_for_exact_seg_i():
@@ -106,7 +108,7 @@ def test_native_rollout_expands_all_support_then_answers():
     assert trace["tool_call_count"] == len(task["support_segment_ids"])
     assert trace["tools"] == [EXPAND_TOOL]
     assert all(prompt == task["rollout_user_prompt"] for prompt in seen_prompts)
-    assert trace["messages"][1]["content"] == task["training_user_prompt"]
+    assert trace["messages"][0]["content"] == task["training_user_prompt"]
     tool_results = [message for message in trace["messages"] if message["role"] == "tool"]
     assert [message["content"] for message in tool_results] == [
         expand(task, segment_id) for segment_id in task["support_segment_ids"]
@@ -142,6 +144,24 @@ def test_parallel_native_expand_calls_are_all_executed_and_preserved():
     ]
     assert assistant_calls[0]["tool_calls"] == calls
     assert len([message for message in trace["messages"] if message["role"] == "tool"]) == len(calls)
+
+
+def test_real_task_system_prompt_is_preserved_without_saving_teacher_prompt():
+    task = generate_task(0, seed=111, distractors=2)
+    task["training_system_prompt"] = "Use the supplied records to answer the question."
+    scripted = iter([
+        _expand_call("call-1", task["support_segment_ids"][0]),
+        {"content": task["expected_final"], "tool_calls": []},
+    ])
+
+    trace = run_agent_rollout(task, lambda _messages, _tools: next(scripted))
+
+    assert trace["messages"][0] == {
+        "role": "system",
+        "content": "Use the supplied records to answer the question.",
+    }
+    assert trace["messages"][1]["role"] == "user"
+    assert all("teacher-only" not in message.get("content", "") for message in trace["messages"])
 
 
 def test_answer_without_expansion_is_rejected():

@@ -62,13 +62,20 @@ EXPAND_TOOL = {
     },
 }
 
-SYSTEM_PROMPT = """Answer the question using the supplied context segments.
-Each segment is named seg_i and initially appears through a compressed memory
-representation rather than as ordinary plaintext. When exact information is
-missing, call the expand tool with the required segment_id to place that
-segment's original text into the conversation. Expand every segment needed for
-the answer, and do not guess omitted facts. You may make multiple tool calls.
-Do not expose hidden reasoning. Finish with exactly the requested FINAL line.
+TEACHER_SYSTEM_PROMPT = """Generate a correct native-tool agent trajectory for the task.
+The user supplies context as numbered compressed segments named seg_i. You see
+lossy routing summaries rather than the model's actual memory representations.
+When exact evidence is needed, call the expand tool with the relevant
+segment_id. After each call, the tool returns that segment's original text.
+
+Use native tool calls, not textual descriptions of calls. Expand every segment
+needed to ground the answer, including multiple segments when the question
+requires combining evidence. Never guess details omitted from the summaries.
+Do not reveal hidden reasoning. When sufficient evidence has been expanded,
+finish with exactly the requested FINAL line and no further tool call.
+
+This is a teacher-only generation instruction. Do not repeat or refer to it in
+the trajectory.
 """
 
 _NAMESPACE = uuid.UUID("5c8f153b-180d-55ad-8ba8-0ef20c37f03a")
@@ -630,12 +637,13 @@ def run_agent_rollout(
 ) -> dict[str, Any]:
     if max_tool_calls <= 0:
         raise ValueError("max_tool_calls must be positive")
-    messages: list[dict[str, Any]] = [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": task["training_user_prompt"]},
-    ]
+    messages: list[dict[str, Any]] = []
+    training_system_prompt = task.get("training_system_prompt")
+    if training_system_prompt:
+        messages.append({"role": "system", "content": training_system_prompt})
+    messages.append({"role": "user", "content": task["training_user_prompt"]})
     rollout_messages: list[dict[str, Any]] = [
-        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "system", "content": TEACHER_SYSTEM_PROMPT},
         {"role": "user", "content": task["rollout_user_prompt"]},
     ]
     tool_call_count = 0
