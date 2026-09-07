@@ -24,6 +24,11 @@ def audit():
     out['recovery']={'completed_partitions':len(paths),'counts':{
         key:sum(r['counts'].get(key,0) for r in reports)
         for key in set().union(*(r['counts'] for r in reports))}}
+    if out['base']['completed_partitions']==64 and len(reports)==64:
+        from data.stage3_release_checks import validate_base_recovery
+        baseline=[json.loads(p.read_text()) for p in
+            sorted((ROOT/'packed-base-cs16-32768').glob('part-*/report.json'))]
+        out['base_combined_counts']=validate_base_recovery(baseline,reports)
     p=ROOT/'agents-qwen-v2/report.json'
     if p.exists():
         out['cleaning']={key:{k:v for k,v in counts.items() if not k.startswith('rejected:')}
@@ -47,7 +52,8 @@ def test():
     result=subprocess.run(['python','-m','pytest','tests/test_expansion_task_normalization.py',
         'tests/test_clean_agent_trajectories.py','tests/test_chat_utils.py','tests/test_preprocess_for_dynamic_packing.py',
         'tests/test_stage3_release_checks.py','tests/test_expansion_judge_json.py',
-        'tests/test_expansion_numeric_normalization.py','tests/test_real_expansion_agent.py','-q'],
+        'tests/test_expansion_numeric_normalization.py','tests/test_real_expansion_agent.py',
+        'tests/test_harvest_expansion_trace.py','tests/test_packed_file_discovery.py','-q'],
         cwd='/opt/lclm',capture_output=True,text=True)
     report={'exit_code':result.returncode,'output':result.stdout+result.stderr}
     if result.returncode==0:

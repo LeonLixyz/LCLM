@@ -20,6 +20,7 @@ def validate():
     results=[]
     for name,command in [
         ('pytest',['python','-m','pytest','tests','-q','--disable-warnings']),
+        ('packed_artifacts',['python','scripts/stage3_packed_artifact_audit.py']),
         ('nccl',['torchrun','--standalone','--nproc_per_node=2','scripts/stage3_nccl_smoke.py']),
         ('fsdp',['torchrun','--standalone','--nproc_per_node=2','scripts/stage3_nccl_smoke.py','--fsdp']),
     ]:

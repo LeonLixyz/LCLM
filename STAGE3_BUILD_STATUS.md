@@ -51,6 +51,41 @@ Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
 
 ## Latest checkpoint — 2026-09-07 00:43 EDT
 
+### Follow-up checkpoint — 2026-09-07 00:57 EDT
+
+- Base resume is still running, now **62/64 partitions complete**. Do not
+  relaunch it. Once all 64 exist, the progress audit automatically verifies
+  combined baseline/recovery row accounting.
+- New Qwen pilot **`ap-IAptVFhDjDVFJAQGxKVdrw`** is running over all 15 sources,
+  writing `full-20260906-v5-audit`. Model startup succeeded and source reports
+  are appearing. Full v5 generation has not started.
+- Implemented final-answer harvesting: native assistant tool calls remain
+  unchanged, their free-text reasoning is removed, and the terminal answer is
+  extracted only from one unambiguous FINAL line. Trailing text/control markers
+  are rejected. Tool results, documents and task instructions are unchanged.
+  Correctness is rechecked on these actual saved training messages. A concise
+  document-task system prompt is now explicitly saved, separate from the
+  teacher-only generation system prompt. Judge failures preserve diagnostic
+  trajectories rather than dropping their messages.
+- Fixed the runtime loader to discover the published `data/*/part-*/*.parquet`
+  layout as well as legacy flat folders. It does not recursively ingest raw,
+  in-progress or quarantine folders, and rejects ambiguous mixed layouts.
+- Validation app **`ap-IjBVOE1vcVbDTce9J1oajn`** passed **152 tests**, the
+  two-rank NCCL/DDP and FSDP smoke runs, and 18 actual packed-sample checks across
+  base/native/recovery. Runtime expansion preserved labeled-token counts and
+  masked memory spans; sampled lengths stayed <=32768; both loader ranks had
+  equal lengths. Reports are in `validation/report.json` and
+  `validation/packed-artifact-audit.json`. These are small-model and sample
+  validations, not a production-scale or complete artifact scan. Re-run final
+  integration including expansion packs once those exist.
+- V5 early source outcomes remain selective: MAUD 13/32, FinQA 3/32,
+  PubMedQA 19/32, ContractNLI 24/32, CLAPNQ 23/32 accepted. CLAPNQ still has six
+  JSON failures; inspect preserved rejected traces/error fields before deciding
+  whether further parser or judge prompting work is needed. Do not relax
+  correctness rules to inflate acceptance.
+
+The older checkpoint details below are historical where superseded above.
+
 Native cleaning and lossless JSON transport export are complete: **1,244,170
 trajectories**. All 64 native packing partitions completed successfully in app
 `ap-TW2Yn7nLWNb2qnOWkWMRkp`: **1,230,344 packed trajectories in 147,706 packs**,
@@ -117,18 +152,16 @@ found issues requiring fixes before a new pilot:
   percentage units. Previously negative and positive answers could compare equal.
 - Financial strict comparisons reject arithmetic errors, rounding differences,
   and scale differences. Do not loosen them blindly to raise acceptance.
-- Some accepted teacher responses contain explanatory computation before their
-  FINAL line despite the teacher instruction. Before full release, decide and
-  implement final-line-only harvesting (preserving all tool calls), reverify the
-  actual saved training messages, and test it. Do not silently call these no-CoT.
+- V4 accepted teacher responses sometimes contain explanatory computation before
+  FINAL. This is fixed by the tested v5 harvesting pass described above.
 - Support currently means all chunks of the source document, not minimal
   evidence. This is conservative but may discard otherwise grounded trajectories.
 - LLM reference/evidence judgment can accept noisy references. It is heuristic;
   manually inspect accepted free-form samples and record limitations.
 
 Code targets the next pilot at **`full-20260906-v5-audit`** and full output at
-**`full-20260906-v5`**, separate from v4 diagnostics. Neither v5 job has been
-launched at this checkpoint. Full generation requires the pilot report and an
+**`full-20260906-v5`**, separate from v4 diagnostics. The v5 pilot is now running;
+full generation has not been launched. Full generation requires the pilot report and an
 explicit `review-passed.json` with `approved: true`, written only after review.
 Do not restart full generation merely because a pilot job completed.
 

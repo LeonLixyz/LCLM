@@ -2,6 +2,12 @@
 import copy
 import json
 
+TASK_SYSTEM_PROMPT = (
+    'Answer the user\'s task using the provided source documents. '
+    'Use the expand tool when exact evidence is needed from a compressed segment. '
+    'Follow the requested final-answer format without intermediate reasoning.'
+)
+
 def maud_field(task):
     lines=task['question'].splitlines()
     return lines[1] if lines[0].startswith('Use these source documents:') else lines[0]
@@ -9,6 +15,7 @@ def maud_field(task):
 def prepare_teacher_task(task,maud_choices=None):
     from data.synthetic_expansion_agent import format_training_user_prompt,format_rollout_user_prompt
     task=copy.deepcopy(task)
+    task.setdefault('training_system_prompt',TASK_SYSTEM_PROMPT)
     if task.get('family')=='acord':
         # Upstream qrels use BEIR scores 0..4, not the paper's 1..5 stars.
         # https://huggingface.co/datasets/theatticusproject/acord

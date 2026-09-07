@@ -20,7 +20,8 @@ def parse_judge_json(content):
 
 def generate_all(client,model,revision,root,commit,reload=None,concurrency=32,
                  output_root=None,sources=None,pilot_limit=None):
-    from data.synthetic_expansion_agent import TEACHER_SYSTEM_PROMPT,messages_for_openai_api,run_agent_rollout
+    from data.synthetic_expansion_agent import TEACHER_SYSTEM_PROMPT,messages_for_openai_api,run_agent_rollout,verify_trace
+    from data.harvest_expansion_trace import harvest_training_messages
     from data.real_expansion_agent import verify_real_trace
     root=Path(root)
     output_root=Path(output_root) if output_root else root
@@ -32,6 +33,8 @@ def generate_all(client,model,revision,root,commit,reload=None,concurrency=32,
         'segment_identity_headers':True,'task_normalization':'source-identity-maud-ontology-acord-beir-v2',
         'judge_json_parser':'strict-optional-json-fence-v1',
         'answer_normalization':'numeric-signs-decimals-percent-v2',
+        'training_harvest':'native-calls-and-explicit-final-v1',
+        'training_system_prompt_version':'document-task-v1',
         'pilot_limit':pilot_limit}
     path=output_root/'generation-manifest.json'
     if path.exists() and json.loads(path.read_text())!=manifest:raise RuntimeError('Incompatible resume settings')
@@ -63,6 +66,7 @@ def generate_all(client,model,revision,root,commit,reload=None,concurrency=32,
                         r=json.loads(line);completed.add(r['task_id']);counts[r['verification']['reason']]+=1
         def process(task):
             task=prepare_teacher_task(task,maud_choices)
+            trace=None
             def complete(messages,tools):
                 response=client.chat.completions.create(model=model,
                     messages=messages_for_openai_api(messages),tools=list(tools) if tools else None,
@@ -72,6 +76,9 @@ def generate_all(client,model,revision,root,commit,reload=None,concurrency=32,
                 return {'content':m.content or '', 'tool_calls':[c.model_dump() for c in (m.tool_calls or [])]}
             try:
                 trace=run_agent_rollout(task,complete,max_tool_calls=16)
+                if not trace.get('rollout_failure_reason'):
+                    trace['messages'],trace['harvesting']=harvest_training_messages(trace['messages'])
+                    trace['verification']=verify_trace(task,trace['messages']).as_dict()
                 if source!='synthetic' and not trace.get('rollout_failure_reason'):
                     trace['verification']=verify_real_trace(task,trace['messages'])
                     verdict=trace['verification']
@@ -95,7 +102,7 @@ def generate_all(client,model,revision,root,commit,reload=None,concurrency=32,
                     generation={'teacher_prompt_saved_in_training_messages':False,'temperature':0,'max_tokens_per_turn':2048})
                 return trace
             except Exception as exc:
-                return {'task_id':task['task_id'],'source_dataset':task.get('source_dataset','synthetic'),
+                return {**(trace or {}),'task_id':task['task_id'],'source_dataset':task.get('source_dataset','synthetic'),
                     'verification':{'accepted':False,'reason':f'generation_exception:{type(exc).__name__}'},'error':str(exc)}
         processed=0;start=time.time()
         with task_path.open() as tasks,accepted.open('a') as out,rejected.open('a') as bad,ThreadPoolExecutor(max_workers=concurrency) as executor:

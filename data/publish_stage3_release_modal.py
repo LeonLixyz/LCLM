@@ -28,7 +28,7 @@ def publish():
     reports['base_recovery']=[json.loads(p.read_text()) for p in recovery_paths]
     base_counts=validate_base_recovery(reports['base'],reports['base_recovery'])
     validation=json.loads((ROOT/'validation/report.json').read_text())
-    if not {'pytest','nccl','fsdp'}<=set(r['check'] for r in validation) or any(r['exit_code'] for r in validation):
+    if not {'pytest','packed_artifacts','nccl','fsdp'}<=set(r['check'] for r in validation) or any(r['exit_code'] for r in validation):
         raise RuntimeError('Validation gate is not green')
     prefix_tests=json.loads((ROOT/'validation/prefix-recovery-tests.json').read_text())
     if prefix_tests['exit_code'] or len(prefix_tests.get('real_tokenizer_boundary_cases',[]))!=8:
@@ -129,6 +129,8 @@ exactly full packs. Overlength and invalid exclusions are reported in the manife
 The base_recovery packed shard group contains only legacy SFT rows rejected by
 the original token-prefix boundary check. It supplements base without duplicating
 originally valid rows; base_combined_counts counts each input row once.
+Pass the downloaded snapshot root to DynamicPackedDataset; it discovers
+data/<component>/part-*/ shards. Existing flat parquet folders remain supported.
 
 See the companion raw collection and build-manifest.json for source licenses,
 provenance, counts, validation limits and per-partition statistics.

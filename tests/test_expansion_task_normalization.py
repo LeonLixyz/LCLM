@@ -1,4 +1,4 @@
-from data.expansion_task_normalization import prepare_teacher_task
+from data.expansion_task_normalization import prepare_teacher_task,TASK_SYSTEM_PROMPT
 
 def test_maud_choices_are_in_both_prompts_without_changing_gold_or_source():
     task={'family':'maud','source_dataset':'theatticusproject/maud',
@@ -20,6 +20,8 @@ def test_regular_task_source_identity_is_not_teacher_only():
     assert 'report-1' in result['training_user_prompt']
     assert 'report-1' in result['rollout_user_prompt']
     assert result['segments'][0]['text']=='SOURCE report-1\ntable'
+    assert result['training_system_prompt']==TASK_SYSTEM_PROMPT
+    assert 'teacher' not in result['training_system_prompt'].lower()
 
 
 def test_acord_uses_beir_scale_in_both_prompts_preserving_gold():

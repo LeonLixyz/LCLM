@@ -99,9 +99,8 @@ class DynamicPackedDataset(IterableDataset):
         self.target_length = target_length
 
         # Get all parquet files
-        all_files = sorted(glob.glob(os.path.join(parquet_path, "*.parquet")))
-        if not all_files:
-            raise ValueError(f"No parquet files found in {parquet_path}")
+        from data.packed_file_discovery import discover_packed_parquet_files
+        all_files = discover_packed_parquet_files(parquet_path)
 
         # Shuffle files deterministically with seed (before dropping/sharding)
         if shuffle_files:
