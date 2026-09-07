@@ -49,7 +49,53 @@ removed, while retaining its task and final-answer contract.
 Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
 `/data/stage3-build-20260906/validation/` on the data volume.
 
-## Latest checkpoint — 2026-09-07 02:00 EDT
+## Latest checkpoint — 2026-09-07 02:28 EDT
+
+- **Full V6 generation submitted:** `ap-AClcBdi6IpX7cwvr24zc0m`, Qwen3-235B
+  Instruct on H200:8, output `full-20260906-v6`, input root
+  `full-20260906-v3` (with corrected PubMed shard). It targets **374,755 tasks**
+  across the 15 implemented sources. Do NOT start a duplicate. The function
+  has a 24-hour timeout and task-ID-based resume; check stopped/running state
+  and persistent source reports before any retry.
+- V6 pilot finished **480 attempted / 222 accepted**. Accepted by source:
+  MAUD 11, FinQA 5, PubMedQA 15, CLAPNQ 18, ContractNLI 27, TATQA 9,
+  ConvFinQA 9, MultiHiertt 7, MultiDoc2Dial 20, FaithDial 11, Watsonx 22,
+  ACORD 26, BillSum 3, LexGLUE 9, synthetic 30.
+- All 222 accepted traces passed the format/label/expanded-body audit in
+  `ap-ZNRkq6Cni4v4SeBh2foZPl`; shortest segment **645 Qwen tokens**. The audit
+  additionally checks every PubMed document ID in every segment, including
+  padding/distractors, against the official 450-example training allowlist.
+- Reviewed two accepted examples per source and the BillSum sentence-level
+  quotation evidence. Internal approval to scale is recorded in
+  `data/reviews/stage3-v6-pilot-review.json` and on the volume at
+  `full-20260906-v6-audit/review-passed.json`. This is **not** final release
+  approval or user sign-off. The gate binds review/counts/source examples to
+  generation manifest SHA256
+  `de96a25ff748eae11cff76e60be5298f229b4d4f77899754dc507017dfe3de83`.
+- Assembled `stage3-build-20260906/expansion-source-provenance.json`: all 15
+  sources, exact upstream revisions, declared licenses, acquisition/conversion
+  receipts, source task counts, official PubMed splits and registry exclusions.
+  Export/publication now require all per-source attempted counts to match this
+  manifest, complete source coverage, matching aggregate reasons, and accepted
+  counts matching the actual JSONL export. Source attributions are added to
+  the raw dataset card. Still review upstream notices before release.
+- Latest focused validation: **90 passed** plus eight actual-tokenizer boundary
+  cases, app `ap-YL6CaesvsO3Hl1f9KNs7Hg`. Final expansion packed/GPU integration
+  remains pending; no new full HF release exists.
+- TechQA archive inspection is complete (`techqa-archive-inspection.json`):
+  600 training questions, 310 development questions, separate validation data,
+  original technote documents and exact answer offsets. It is a regular tar
+  archive, not WebDataset. Its embedded README declares **CDLA-Permissive-1.0**;
+  corrected the registry's previously incorrect Apache-2.0 data-license entry.
+  A source-specific training-only adapter and pilot are still needed. Do not
+  silently add it to the currently running 15-source build. Other unresolved
+  registry sources/FAv2/license choices remain as documented below.
+- The progress audit now includes `full_v6` per-source progress/completion
+  reports. Next: monitor the full job, inspect early acceptance/circuit-breaker
+  behavior; work on final integration and unresolved source adapters meanwhile.
+  Export and packing can start only after full generation count gates pass.
+
+## Historical checkpoint — 2026-09-07 02:00 EDT
 
 - **New V6 pilot is running:** `ap-9Nge1n4hfkSvPP1GtXSG2u`, 32 tasks per
   source / 480 attempts, Qwen3-235B-Instruct on H200:8. Output is

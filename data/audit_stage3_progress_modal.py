@@ -40,6 +40,18 @@ def audit():
         out['pilot_'+version]={p.name:json.loads(p.read_text()) for p in sorted(pilot.glob('*.json'))
             if 'manifest' not in p.name and p.name not in {'review-samples.json','review-errors.json'}
             and not p.name.startswith('semantic-review-')}
+    full=source.parent/'full-20260906-v6'
+    out['full_v6']={}
+    from data.build_full_expansion_tasks_modal import SOURCES
+    for key in SOURCES:
+        for suffix in ('generation','progress'):
+            path=full/(key+'.'+suffix+'.json')
+            if path.exists():
+                out['full_v6'][key]=json.loads(path.read_text())
+                break
+    completion=full/'full-generation-report.json'
+    if completion.exists():
+        out['full_v6_completion']=json.loads(completion.read_text())
     (ROOT/'progress-audit.json').write_text(json.dumps(out,indent=2));volume.commit()
     return out
 

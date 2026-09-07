@@ -78,6 +78,9 @@ def audit():
                     from data.pubmedqa_split import training_ids
                     allowed=training_ids(json.loads(Path('/data/stage3-agent/real-expansion/sources/pubmedqa_labeled/official-splits/split-manifest.json').read_text()))
                     assert row['source_row_id'] in allowed
+                    for body in segments.values():
+                        ids=set(re.findall(r'(?:RELATED )?SOURCE pubmed-(\d+)',body))
+                        assert ids and ids<=allowed, 'Held-out PubMedQA document in segment pool'
                     assert verify_real_trace(task,messages)['accepted']
                 else:
                     assert verify_real_trace(task,messages)['reason'].startswith(('accepted:','wrong_answer:'))

@@ -12,7 +12,7 @@ PACKED_REPO=RAW_REPO+'-packed-cs16-32k'
               secrets=[modal.Secret.from_name('huggingface')])
 def publish():
     from huggingface_hub import HfApi
-    from data.stage3_release_checks import validate_base_recovery
+    from data.stage3_release_checks import validate_base_recovery,validate_expansion_completion
     reports={}
     for kind in ('base','agents','expansion'):
         root=ROOT/f'packed-{kind}-cs16-32768'
@@ -43,6 +43,11 @@ def publish():
     if generation['status']!='complete':raise RuntimeError('Generation incomplete')
     if generation['manifest'].get('pubmedqa_split',{}).get('train_rows')!=450:
         raise RuntimeError('Expansion source split provenance is stale')
+    provenance=json.loads((ROOT/'expansion-source-provenance.json').read_text())
+    source_reports=[json.loads((generation_root/(r['source']+'.generation.json')).read_text()) for r in provenance['sources']]
+    generation_counts=validate_expansion_completion(generation,source_reports,provenance)
+    if expansion['rows']!=generation_counts['accepted']:
+        raise RuntimeError('Expansion generation/export count mismatch')
     # Source split/license and generated-data review must be recorded explicitly.
     review_path=ROOT/'release-review.json'
     if not review_path.exists() or json.loads(review_path.read_text()).get('approved') is not True:
@@ -68,6 +73,8 @@ def publish():
     summary={'raw_repo':RAW_REPO,'packed_repo':PACKED_REPO,
         'native_rows':native['rows'],'expansion_rows':expansion['rows'],'packing':reports,
         'base_combined_counts':base_counts,
+        'expansion_generation_counts':generation_counts,
+        'expansion_source_provenance':provenance,
         'source_revisions':json.loads((ROOT/'agent-source-manifest.json').read_text()),
         'validation':validation,'review':json.loads(review_path.read_text())}
     for repo in (RAW_REPO,PACKED_REPO):
@@ -113,6 +120,14 @@ avoid heterogeneous Arrow tool-schema casts. Decode with json.loads before
 applying Qwen's chat template. The LCLM packer handles this automatically.
 Fully nested, native training JSONL is also available under native-jsonl/.
 '''
+    raw_card += '\n## Expansion source provenance\n\n'
+    raw_card += '| Source | Upstream | Declared license | Prompt tasks |\n| --- | --- | --- | ---: |\n'
+    for record in provenance['sources']:
+        source_id=record['source_id']
+        upstream=source_id if source_id.startswith('https://') else (
+            'https://huggingface.co/datasets/'+source_id if record['source']!='synthetic' else 'https://github.com/LeonLixyz/LCLM')
+        raw_card += f"| {record['source']} | [{source_id}]({upstream}) | {record['declared_license']} | {record['tasks']:,} |\n"
+    raw_card += '\nThese are input task counts, not accepted trace counts. Exact revisions, conversion receipts, exclusions and official PubMedQA holdouts are in build-manifest.json. Upstream terms and notices continue to apply; this collection does not relicense source content.\n'
     packed_card='''---
 configs:
 - config_name: default

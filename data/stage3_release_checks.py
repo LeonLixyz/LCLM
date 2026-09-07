@@ -1,5 +1,44 @@
 """Pure count checks shared by release publication and tests."""
 
+def validate_pilot_review(generation, audit, review):
+    import hashlib
+    import json
+    digest=hashlib.sha256(json.dumps(generation['manifest'],sort_keys=True).encode()).hexdigest()
+    if generation.get('status')!='complete' or audit.get('status')!='passed' or review.get('approved') is not True:
+        raise ValueError('Pilot generation/audit/review is not approved')
+    if audit.get('generation_manifest_sha256')!=digest or review.get('generation_manifest_sha256')!=digest:
+        raise ValueError('Pilot review is stale for this generation manifest')
+    accepted=sum(v for k,v in generation['reasons'].items() if k.startswith('accepted'))
+    if accepted!=audit['accepted_traces'] or accepted!=review.get('accepted_traces'):
+        raise ValueError('Pilot review accepted-count mismatch')
+    samples=review.get('reviewed_examples',{})
+    if set(samples)!=set(audit['sources']) or any(len(samples[k])<min(2,v['accepted']) for k,v in audit['sources'].items()):
+        raise ValueError('Pilot review is missing source-stratified examples')
+    return digest
+
+def validate_expansion_completion(generation, source_reports, provenance):
+    from collections import Counter
+    if generation.get('status') != 'complete' or provenance.get('status') != 'assembled':
+        raise ValueError('Expansion generation/provenance is incomplete')
+    expected = {r['source']:r['tasks'] for r in provenance['sources']}
+    actual = {r['source']:r for r in source_reports}
+    if len(expected) != len(provenance['sources']) or len(actual) != len(source_reports) or set(expected) != set(actual):
+        raise ValueError('Expansion source coverage is incomplete or duplicated')
+    totals = Counter(); accepted = 0
+    for source, rows in expected.items():
+        report = actual[source]
+        reasons = report['reasons']
+        if report.get('status') != 'complete' or any(type(v) is not int or v < 0 for v in reasons.values()):
+            raise ValueError(f'Invalid expansion source report: {source}')
+        if sum(reasons.values()) != rows:
+            raise ValueError(f'Expansion attempted/task-count mismatch: {source}')
+        accepted += sum(v for k,v in reasons.items() if k.startswith('accepted'))
+        totals.update(reasons)
+    if dict(totals) != generation['reasons'] or sum(expected.values()) != provenance['tasks']:
+        raise ValueError('Expansion aggregate accounting mismatch')
+    return {'tasks':sum(expected.values()), 'accepted':accepted,
+            'rejected':sum(expected.values())-accepted, 'sources':len(expected)}
+
 
 def validate_base_recovery(base_reports, recovery_reports, partitions=64):
     base = {r['partition']: r['counts'] for r in base_reports}

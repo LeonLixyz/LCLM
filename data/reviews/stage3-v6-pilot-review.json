@@ -1,0 +1,83 @@
+{
+  "approved": true,
+  "scope": "Internal approval to scale V6 generation only; not dataset release approval or user sign-off",
+  "reviewed_at_utc": "2026-09-07T06:26:00Z",
+  "accepted_traces": 222,
+  "generation_manifest_sha256": "de96a25ff748eae11cff76e60be5298f229b4d4f77899754dc507017dfe3de83",
+  "reviewed_examples": {
+    "maud": [
+      "rea3-9a37ee1ac1e3f8e6033966cb",
+      "rea3-830bb71bc0a8805d1af4dbba"
+    ],
+    "finqa": [
+      "rea3-3dfdc514128240eb7f033913",
+      "rea3-8e9038dbf61d44e4af26858b"
+    ],
+    "pubmedqa_labeled": [
+      "rea3-84874685ffc99aa0ef6474da",
+      "rea3-e0ceace1498b1b9e67e6b7b4"
+    ],
+    "clapnq": [
+      "rea3-7f390dc21697d02910b43f1f",
+      "rea3-bbe79b82b63926e2684127b0"
+    ],
+    "contract_nli": [
+      "rea3-6d4f2b68871ab3e6712a2ee3",
+      "rea3-8f08c0703a28507d0395e959"
+    ],
+    "tatqa": [
+      "rea3-c07b25cb8bd760a45840f7dc",
+      "rea3-916dd7686ab59cac0df1a697"
+    ],
+    "convfinqa": [
+      "rea3-7c47d81b064fe617f29f94ff",
+      "rea3-a1f444a1a09f8a3cfebe7d70"
+    ],
+    "multihiertt": [
+      "rea3-9d55678f8d850f01f48aeb7e",
+      "rea3-11fb8eddfd98b07bb7d238a9"
+    ],
+    "multidoc2dial": [
+      "rea3-2532ec1d5d1c327ca8be84a0",
+      "rea3-2572162d29ab5b3903220cdf"
+    ],
+    "faithdial": [
+      "rea3-10f5e0378645a4aa9d55fb17",
+      "rea3-866d04a6e636b7bbc70cbcb7"
+    ],
+    "watsonx_docs_qa": [
+      "rea3-d2073fc87dae0c42032a01f4",
+      "rea3-cfa73688117d5d12b6a4218c"
+    ],
+    "acord": [
+      "rea3-016f5b414f629f3e863f1f88",
+      "rea3-97aeaf52fa5b3386a48a69ab"
+    ],
+    "billsum": [
+      "rea3-f8954f1ae4037d445f60fb10",
+      "rea3-59a54b6feb018536163f0447"
+    ],
+    "lex_glue": [
+      "rea3-db27e0f3149996672a45b4f0",
+      "rea3-9d69d4b05720b971e77ba26f"
+    ],
+    "synthetic": [
+      "sea-ccddbd42-14ae-5bdc-9bb2-465af9778a07",
+      "sea-6341e181-1ab5-5c6e-be84-e312f07d56cb"
+    ]
+  },
+  "evidence": [
+    "All 222 accepted trajectories passed tool-body, task-system, teacher-prompt separation and assistant-only masking checks.",
+    "Minimum segment length 645 pinned Qwen tokens; all PubMed source IDs and segment documents are in official fold-0 training.",
+    "Two accepted examples per source inspected against source references and evidence excerpts; BillSum checked with sentence-level evidence quotations.",
+    "Exact source labels/numeric outputs remain strict; semantic votes cannot override structural failures or wrong PubMedQA decisions.",
+    "No known suspect establishment/president errors approved by the revised filter."
+  ],
+  "limits": [
+    "Same-model free-form semantic judgments are correlated heuristics, not correctness guarantees.",
+    "Source references and questions may contain noise; no exhaustive semantic inspection of all future traces.",
+    "Summary quotation checks are conservative and reject some valid paraphrases.",
+    "Approval covers the 15 implemented sources only; unresolved registry sources remain explicitly excluded/pending.",
+    "Full generation and final raw/packed integration, source review and HF publication still required."
+  ]
+}

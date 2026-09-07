@@ -1,6 +1,8 @@
 from copy import deepcopy
 import pytest
 from data.stage3_release_checks import validate_base_recovery
+from data.stage3_release_checks import validate_expansion_completion
+from data.stage3_release_checks import validate_pilot_review
 
 
 def reports():
@@ -31,3 +33,45 @@ def test_recovery_requires_complete_unique_partitions():
         validate_base_recovery(base, recovery, partitions=2)
     with pytest.raises(ValueError):
         validate_base_recovery(base, recovery*2, partitions=1)
+
+def expansion_reports():
+    reasons={'accepted:exact':2,'wrong_answer':1}
+    return ({'status':'complete','reasons':reasons},
+            [{'source':'example','status':'complete','reasons':reasons.copy()}],
+            {'status':'assembled','tasks':3,'sources':[{'source':'example','tasks':3}]})
+
+def test_expansion_requires_every_task_accounted_for():
+    assert validate_expansion_completion(*expansion_reports()) == {
+        'tasks':3,'accepted':2,'rejected':1,'sources':1}
+
+@pytest.mark.parametrize('failure',['partial','missing_source','duplicate','wrong_total','wrong_attempts','negative'])
+def test_incomplete_expansion_is_not_publishable(failure):
+    generation,sources,provenance=expansion_reports()
+    if failure=='partial':generation['status']='partial'
+    elif failure=='missing_source':sources=[]
+    elif failure=='duplicate':sources=sources*2
+    elif failure=='wrong_total':generation['reasons']={'accepted:exact':3}
+    elif failure=='wrong_attempts':provenance['sources'][0]['tasks']=4
+    else:sources[0]['reasons']['wrong_answer']=-1
+    with pytest.raises(ValueError):validate_expansion_completion(generation,sources,provenance)
+
+def pilot_reports():
+    import hashlib,json
+    manifest={'model':'pinned'}
+    digest=hashlib.sha256(json.dumps(manifest,sort_keys=True).encode()).hexdigest()
+    return ({'status':'complete','manifest':manifest,'reasons':{'accepted':2}},
+            {'status':'passed','accepted_traces':2,'generation_manifest_sha256':digest,'sources':{'source':{'accepted':2}}},
+            {'approved':True,'accepted_traces':2,'generation_manifest_sha256':digest,'reviewed_examples':{'source':['one','two']}})
+
+def test_review_is_bound_to_pilot_manifest():
+    reports=pilot_reports()
+    assert validate_pilot_review(*reports)==reports[2]['generation_manifest_sha256']
+
+@pytest.mark.parametrize('failure',['stale','count','samples','approval'])
+def test_bad_pilot_review_fails_closed(failure):
+    generation,audit,review=pilot_reports()
+    if failure=='stale':review['generation_manifest_sha256']='different'
+    elif failure=='count':review['accepted_traces']=3
+    elif failure=='samples':review['reviewed_examples']={}
+    else:review['approved']=False
+    with pytest.raises(ValueError):validate_pilot_review(generation,audit,review)

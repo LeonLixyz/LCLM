@@ -21,7 +21,14 @@ def export(kind:str='agents'):
     elif kind=='expansion':
         source=Path('/data/stage3-agent/real-expansion/pilots/full-20260906-v6')
         if not (source/'full-generation-report.json').exists():raise RuntimeError('Generation is not complete')
+        from data.stage3_release_checks import validate_expansion_completion
+        provenance=json.loads((ROOT/'expansion-source-provenance.json').read_text())
+        generation=json.loads((source/'full-generation-report.json').read_text())
+        source_reports=[json.loads((source/(r['source']+'.generation.json')).read_text()) for r in provenance['sources']]
+        generation_counts=validate_expansion_completion(generation,source_reports,provenance)
         inputs=sorted(source.glob('*.accepted.jsonl'))
+        if {p.name for p in inputs}!={r['source']+'.accepted.jsonl' for r in provenance['sources']}:
+            raise RuntimeError('Unexpected/missing expansion source files')
     else:raise ValueError('Unknown export kind')
     destination=ROOT/f'{kind}-transport'
     if (destination/'report.json').exists():return json.loads((destination/'report.json').read_text())
@@ -50,6 +57,8 @@ def export(kind:str='agents'):
                 buffer.append(out);counts[out['source_dataset']+':'+out['sub_dataset']]+=1
                 if len(buffer)>=2000:flush()
     flush()
+    if kind=='expansion' and sum(counts.values())!=generation_counts['accepted']:
+        raise RuntimeError('Expansion JSONL/report accepted-count mismatch')
     result={'kind':kind,'rows':sum(counts.values()),'source_counts':dict(counts),'parquet_files':files,
         'native_jsonl_inputs':[str(p) for p in inputs],
         'transport':'json.loads(messages), json.loads(tools) restores the native Qwen-ready objects losslessly'}

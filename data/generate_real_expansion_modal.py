@@ -166,6 +166,9 @@ class RealExpansionGenerator:
         review_path=DATA_ROOT/'full-20260906-v6-audit'/'review-passed.json'
         if not review_path.exists() or json.loads(review_path.read_text()).get('approved') is not True:
             raise RuntimeError('Source-stratified pilot review has not passed')
+        from data.stage3_release_checks import validate_pilot_review
+        validate_pilot_review(json.loads(audit_path.read_text()),
+            json.loads((audit_path.parent/'format-audit.json').read_text()),json.loads(review_path.read_text()))
         client=OpenAI(api_key='not-needed',base_url=f'http://127.0.0.1:{MODEL_PORT}/v1',timeout=300,max_retries=2)
         return generate_all(client,SERVED_MODEL_NAME,MODEL_REVISION,
             DATA_ROOT/'full-20260906-v3',data_volume.commit,data_volume.reload,

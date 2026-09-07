@@ -99,9 +99,9 @@ SOURCE_SPECS: tuple[SourceSpec, ...] = (
         adapter="techqa",
         acquisition="huggingface",
         source_id="PrimeQA/TechQA",
-        license="Apache-2.0",
+        license="CDLA-Permissive-1.0",
         partitions=(Partition("default"),),
-        notes="Real developer-forum questions linked to IBM Technotes.",
+        notes="Real developer-forum questions linked to IBM Technotes. Archive README declares CDLA-Permissive-1.0; HF repository metadata is not the data license. Use training_Q_A.json, never dev/validation labels.",
     ),
     SourceSpec(
         key="watsonx_docs_qa",
