@@ -72,7 +72,7 @@ def test():
         'tests/test_harvest_expansion_trace.py','tests/test_packed_file_discovery.py',
         'tests/test_expansion_semantic_review.py','tests/test_pubmedqa_split.py',
         'tests/test_techqa_adapter.py','tests/test_expansion_checkpoint_audit.py',
-        'tests/test_expansion_trace_audit.py','-q'],
+        'tests/test_expansion_trace_audit.py','tests/test_source_notices.py','-q'],
         cwd='/opt/lclm',capture_output=True,text=True)
     report={'exit_code':result.returncode,'output':result.stdout+result.stderr}
     if result.returncode==0:

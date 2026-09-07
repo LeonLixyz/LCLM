@@ -57,8 +57,23 @@ def publish():
     review_path=ROOT/'release-review.json'
     if not review_path.exists() or json.loads(review_path.read_text()).get('approved') is not True:
         raise RuntimeError('Missing final source/trajectory/packed-data review')
+    review=json.loads(review_path.read_text())
+    notices_root=ROOT/'source-notices-v1'
+    notices_bytes=(notices_root/'index.json').read_bytes()
+    notices=json.loads(notices_bytes)
+    if review.get('source_notices_index_sha256')!=hashlib.sha256(notices_bytes).hexdigest() or review.get('base_mixture_terms_reviewed') is not True:
+        raise RuntimeError('Final review must cover this notice bundle and original base-mixture terms')
+    from data.source_notices import validate_notice_bundle
+    expected_notices={('expansion',r['source']):(r['source_id'],r['upstream_revision'])
+        for r in provenance['sources'] if r['source']!='synthetic'}
+    expected_notices.update({('agents',r['repo'].replace('/','--')):(r['repo'],r['revision'])
+        for r in json.loads((ROOT/'agent-source-manifest.json').read_text())})
+    validate_notice_bundle(notices_root,notices,expected_notices)
     api=HfApi()
     for repo in (RAW_REPO,PACKED_REPO):api.create_repo(repo,repo_type='dataset',exist_ok=True)
+    for repo in (RAW_REPO,PACKED_REPO):
+        api.upload_folder(repo_id=repo,repo_type='dataset',folder_path=notices_root,
+            path_in_repo='source-notices',ignore_patterns=['state.json'])
     raw_roots={'base':Path('/data/stage3-final-mixture-cot50-v1'),
         'agents':ROOT/'agents-transport','expansion':ROOT/'expansion-transport'}
     for kind,folder in raw_roots.items():
@@ -80,6 +95,7 @@ def publish():
         'base_combined_counts':base_counts,
         'expansion_generation_counts':generation_counts,
         'expansion_format_audits':expansion['format_audits'],
+        'source_notices_index_sha256':hashlib.sha256(notices_bytes).hexdigest(),
         'expansion_source_provenance':provenance,
         'source_revisions':json.loads((ROOT/'agent-source-manifest.json').read_text()),
         'validation':validation,'packed_artifact_audit':artifact_audit,
@@ -127,6 +143,8 @@ Agent/expansion Parquet fields messages and tools are lossless JSON strings to
 avoid heterogeneous Arrow tool-schema casts. Decode with json.loads before
 applying Qwen's chat template. The LCLM packer handles this automatically.
 Fully nested, native training JSONL is also available under native-jsonl/.
+Preserved upstream dataset cards and notices are under source-notices/; the
+index records their original paths, pinned source revisions and file hashes.
 '''
     raw_card += '\n## Expansion source provenance\n\n'
     raw_card += '| Source | Upstream | Declared license | Prompt tasks |\n| --- | --- | --- | ---: |\n'

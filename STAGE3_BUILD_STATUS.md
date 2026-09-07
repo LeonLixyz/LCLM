@@ -49,7 +49,34 @@ removed, while retaining its task and final-answer contract.
 Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
 `/data/stage3-build-20260906/validation/` on the data volume.
 
-## Latest checkpoint — 2026-09-07 14:48 EDT
+## Latest checkpoint — 2026-09-07 15:21 EDT
+
+- Full V6 teacher remains active in `ap-UXSWSfrR3pbU6soJrhFl1B`. Latest inspected
+  MultiDoc2Dial checkpoint: **13,315 cumulative attempts / 7,910 accepted**
+  (5,200 new attempts after resume). No duplicate job was launched.
+- Collected **19 upstream notice/card files across all 17 native-agent and
+  non-synthetic expansion sources** from their pinned downloaded checkouts.
+  Bundle: `/data/stage3-build-20260906/source-notices-v1/`, with `index.json`
+  recording source revisions, original paths, sizes and SHA256 values.
+  Collection app: `ap-VquvZeacxxjqxlkqqWyRYC`; byte/coverage verification rerun:
+  `ap-vj9iErJYKXpE2wQlkcG2xP`. This is notice preservation, **not legal clearance**.
+- Inspected the native-agent dataset cards: Nemotron v1 declares CC-BY-4.0
+  plus Glaive's Apache-2.0 notice; v2 declares CC-BY-4.0 plus Apache-2.0/MIT
+  source terms; OpenThoughts declares Apache-2.0 and identifies its upstream
+  task sources. Underlying source restrictions still require final review.
+  Most HF snapshots contain only a dataset card, not standalone license text.
+- Publisher now preserves this bundle in both HF repos and verifies all source
+  IDs/revisions and notice bytes before upload. Final `release-review.json`
+  must bind `source_notices_index_sha256` and set `base_mixture_terms_reviewed`
+  only after actual review of the original base mixture. Do not preapprove
+  those fields. The bundle does not cover a complete base-mixture terms audit.
+- Focused validation: **141 tests passed** plus eight real-Qwen boundary cases,
+  `ap-yYKKCjRUsKAuieoTAmYqoh`. Notice tests cover exact copies, missing sources,
+  stale revisions, changed bytes, symlinks and unsafe relative paths.
+- Generation/export/packing/final GPU validation remain incomplete; no new HF
+  release exists. Continue the later-source audits and source/semantic review.
+
+## Historical checkpoint — 2026-09-07 14:48 EDT
 
 - Full V6 teacher still running in `ap-UXSWSfrR3pbU6soJrhFl1B`; do not duplicate.
   Latest inspected MultiDoc2Dial report has 2,500 new attempts after resume,
