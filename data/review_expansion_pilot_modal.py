@@ -4,8 +4,8 @@ from pathlib import Path
 import modal
 from data.stage3_full_modal import image,volume
 
-ROOT=Path('/data/stage3-agent/real-expansion/pilots/full-20260906-v5-audit')
-app=modal.App('lclm-expansion-pilot-review-v5')
+ROOT=Path('/data/stage3-agent/real-expansion/pilots/full-20260906-v6-audit')
+app=modal.App('lclm-expansion-pilot-review-v6')
 
 @app.function(image=image,cpu=8,memory=32768,timeout=1800,volumes={'/data':volume})
 def audit():
@@ -66,6 +66,21 @@ def audit():
                 'support_segment_ids':row['support_segment_ids'],'gold_answer':row['gold_answer'],
                 'expected_final':'FINAL: '+str(row['gold_answer']),'source_dataset':row['source_dataset']}
             if source=='synthetic':assert verify_trace(task,messages).accepted
+            elif row['verification'].get('answer_metric')=='qwen_question_evidence_dual_judge':
+                semantic=row['verification']['semantic_review']
+                assert semantic['keep'] is True
+                assert all(semantic[k]['correct'] is True and semantic[k]['grounded'] is True
+                           for k in ('blind_vote','reference_vote'))
+                if source=='billsum':
+                    assert semantic['summary_claims']['keep'] is True
+                    assert all(v['supported'] and v['quotes_present'] for v in semantic['summary_claims']['claims'])
+                if source=='pubmedqa_labeled':
+                    from data.pubmedqa_split import training_ids
+                    allowed=training_ids(json.loads(Path('/data/stage3-agent/real-expansion/sources/pubmedqa_labeled/official-splits/split-manifest.json').read_text()))
+                    assert row['source_row_id'] in allowed
+                    assert verify_real_trace(task,messages)['accepted']
+                else:
+                    assert verify_real_trace(task,messages)['reason'].startswith(('accepted:','wrong_answer:'))
             elif row['verification'].get('answer_metric')!='qwen_reference_and_evidence_judge':
                 assert verify_real_trace(task,messages)['accepted']
             else:

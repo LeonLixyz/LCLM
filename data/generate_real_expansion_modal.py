@@ -161,15 +161,15 @@ class RealExpansionGenerator:
         from openai import OpenAI
         from data.full_expansion_rollouts import generate_all
         data_volume.reload()
-        audit_path=DATA_ROOT/'full-20260906-v5-audit'/'pilot-generation-report.json'
+        audit_path=DATA_ROOT/'full-20260906-v6-audit'/'pilot-generation-report.json'
         if not audit_path.exists():raise RuntimeError('Complete and inspect the source-stratified pilot first')
-        review_path=DATA_ROOT/'full-20260906-v5-audit'/'review-passed.json'
+        review_path=DATA_ROOT/'full-20260906-v6-audit'/'review-passed.json'
         if not review_path.exists() or json.loads(review_path.read_text()).get('approved') is not True:
             raise RuntimeError('Source-stratified pilot review has not passed')
         client=OpenAI(api_key='not-needed',base_url=f'http://127.0.0.1:{MODEL_PORT}/v1',timeout=300,max_retries=2)
         return generate_all(client,SERVED_MODEL_NAME,MODEL_REVISION,
             DATA_ROOT/'full-20260906-v3',data_volume.commit,data_volume.reload,
-            output_root=DATA_ROOT/'full-20260906-v5')
+            output_root=DATA_ROOT/'full-20260906-v6',strict_semantics=True)
 
     @modal.method()
     def audit_full(self) -> dict[str, Any]:
@@ -179,12 +179,12 @@ class RealExpansionGenerator:
         client=OpenAI(api_key='not-needed',base_url=f'http://127.0.0.1:{MODEL_PORT}/v1',timeout=300,max_retries=2)
         return generate_all(client,SERVED_MODEL_NAME,MODEL_REVISION,
             DATA_ROOT/'full-20260906-v3',data_volume.commit,data_volume.reload,
-            output_root=DATA_ROOT/'full-20260906-v5-audit',pilot_limit=32)
+            output_root=DATA_ROOT/'full-20260906-v6-audit',pilot_limit=32,strict_semantics=True)
 
     @modal.method()
-    def semantic_review(self) -> dict[str, Any]:
+    def semantic_review(self, summary_claims: bool = False) -> dict[str, Any]:
         from openai import OpenAI
-        from data.expansion_semantic_review import review_pilot
+        from data.expansion_semantic_review import review_pilot, review_summary_pilot
         data_volume.reload()
         client = OpenAI(api_key='not-needed', base_url=f'http://127.0.0.1:{MODEL_PORT}/v1', timeout=300, max_retries=2)
         def complete(messages):
@@ -192,7 +192,8 @@ class RealExpansionGenerator:
                 messages=messages, temperature=0, max_tokens=512,
                 extra_body={'chat_template_kwargs': {'enable_thinking': False}})
             return response.choices[0].message.content
-        return review_pilot(DATA_ROOT/'full-20260906-v5-audit', complete,
+        review = review_summary_pilot if summary_claims else review_pilot
+        return review(DATA_ROOT/'full-20260906-v5-audit', complete,
                             data_volume.commit, MODEL_ID, MODEL_REVISION)
 
     @modal.method()
@@ -368,11 +369,14 @@ def main(
     full: bool = False,
     audit_full: bool = False,
     semantic_review: bool = False,
+    summary_claims: bool = False,
 ) -> None:
     if sum((full, audit_full, semantic_review)) > 1:
         raise ValueError('Choose only one full/pilot/semantic review mode')
+    if summary_claims and not semantic_review:
+        raise ValueError('--summary-claims requires --semantic-review')
     if semantic_review:
-        print(json.dumps(RealExpansionGenerator().semantic_review.remote(), indent=2))
+        print(json.dumps(RealExpansionGenerator().semantic_review.remote(summary_claims), indent=2))
         return
     if audit_full:
         print(json.dumps(RealExpansionGenerator().audit_full.remote(),indent=2))

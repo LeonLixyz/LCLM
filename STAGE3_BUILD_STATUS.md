@@ -49,7 +49,52 @@ removed, while retaining its task and final-answer contract.
 Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
 `/data/stage3-build-20260906/validation/` on the data volume.
 
-## Latest checkpoint — 2026-09-07 01:27 EDT
+## Latest checkpoint — 2026-09-07 02:00 EDT
+
+- **New V6 pilot is running:** `ap-9Nge1n4hfkSvPP1GtXSG2u`, 32 tasks per
+  source / 480 attempts, Qwen3-235B-Instruct on H200:8. Output is
+  `full-20260906-v6-audit`. Do not launch a duplicate. Full generation still has
+  NOT started. Generator, exporter and publisher now target **V6**, not V5.
+- V5 semantic review finished: 98/115 kept, 13 rejected, 4 malformed-response
+  errors. This caught the CLAPNQ mismatch, but missed the BillSum establishment
+  claim. Full source evidence confirms that claim is wrong: the bill refers to
+  an authority established under a different act.
+- Sentence-level BillSum recheck finished in `ap-hU75aCHm8WWjE7zjdREsUd`:
+  1/16 kept, 11 rejected, 4 malformed/truncated JSON errors. The known bad
+  establishment claim was rejected. Each sentence now needs a positive
+  entailment vote and quotations that occur verbatim (whitespace-normalized)
+  in the source. Explicit RELATED SOURCE padding is excluded from this check.
+  This is deliberately conservative and can reject good summaries too.
+  The same-model semantic judgments are still heuristics, not guarantees.
+- V6 applies the dual question/evidence review to free-form and otherwise
+  correct PubMedQA responses; it additionally applies the sentence check to
+  BillSum. Structural failures and wrong biomedical decisions cannot be
+  overridden by the judge. Saved training messages are unchanged by judging.
+  Judge output allowance is now 2,048 tokens to reduce truncated quotations.
+  New manifest fields prevent resuming with the old verification settings.
+- **PubMedQA split fixed:** HF's single `train` contains all 1,000 labeled
+  examples, including the official test set. Ran the official split script at
+  `pubmedqa/pubmedqa@1cbae8e92f72f20c8d3747cbb3bf5bc53554d997` in a fresh checkout.
+  Only fold-0's **450 training examples** are now eligible; 50 dev + 500 test
+  examples are excluded BEFORE building documents/distractors. The builder
+  fails closed without the pinned, disjoint split manifest. Source evidence:
+  https://github.com/pubmedqa/pubmedqa/blob/1cbae8e92f72f20c8d3747cbb3bf5bc53554d997/preprocess/split_dataset.py
+- PubMed repair completed in `ap-FnXDjtVsAywD5FEamLlhiM`. Original task/build/
+  aggregate-manifest files were **moved, not deleted**, to
+  `full-20260906-v3/quarantine-pubmed-original1000/`. Current task root remains
+  `full-20260906-v3`, with the repaired PubMed shard. Total eligible prompt
+  tasks are now **374,755**, not 375,305. Old PubMed pilots remain diagnostics.
+  Report: `sources/pubmedqa_labeled/official-splits/task-repair-report.json`.
+- Latest focused validation: **78 passed**, plus all eight pinned-tokenizer
+  boundary cases, app `ap-OQeuMxe9UTKLdQhh3i3v3q`. Final GPU integration must
+  still include the eventual expansion packs.
+- Next: inspect V6 source outcomes and accepted samples; run
+  `modal run -m data.review_expansion_pilot_modal` (now targets V6). Only write
+  V6 `review-passed.json` after actual review. Then full V6 generation may start.
+  Do not re-run V5 semantic diagnostics; their reports are complete.
+- No HF release yet. Base/native/recovery completion below remains current.
+
+## Historical checkpoint — 2026-09-07 01:27 EDT
 
 - Base packing and recovery are **complete, all 64 partitions each**. Combined
   accounting passes: 20,326,114 input rows = **20,286,582 packed rows** + 27,634

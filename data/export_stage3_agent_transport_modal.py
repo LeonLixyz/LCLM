@@ -19,7 +19,7 @@ def export(kind:str='agents'):
         if any(name not in report for name in names):raise RuntimeError('Native cleaning is not complete')
         inputs=[source/(name+'.jsonl') for name in names]
     elif kind=='expansion':
-        source=Path('/data/stage3-agent/real-expansion/pilots/full-20260906-v5')
+        source=Path('/data/stage3-agent/real-expansion/pilots/full-20260906-v6')
         if not (source/'full-generation-report.json').exists():raise RuntimeError('Generation is not complete')
         inputs=sorted(source.glob('*.accepted.jsonl'))
     else:raise ValueError('Unknown export kind')

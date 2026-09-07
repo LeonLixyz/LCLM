@@ -35,7 +35,7 @@ def audit():
                          for key,counts in json.loads(p.read_text()).items()}
     source=Path('/data/stage3-agent/real-expansion/pilots/full-20260906-v3')
     out['tasks']=[json.loads(p.read_text()) for p in sorted(source.glob('*.build.json'))]
-    for version in ['v4','v5']:
+    for version in ['v4','v5','v6']:
         pilot=source.parent/f'full-20260906-{version}-audit'
         out['pilot_'+version]={p.name:json.loads(p.read_text()) for p in sorted(pilot.glob('*.json'))
             if 'manifest' not in p.name and p.name not in {'review-samples.json','review-errors.json'}
@@ -44,7 +44,7 @@ def audit():
     return out
 
 @app.local_entrypoint()
-def main(tests:bool=False, samples:bool=False, version:str='v5', sources:str='finqa,convfinqa,clapnq,lex_glue'):
+def main(tests:bool=False, samples:bool=False, version:str='v6', sources:str='finqa,convfinqa,clapnq,lex_glue'):
     print(json.dumps(test.remote() if tests else inspect_pilot.remote(version,sources) if samples else audit.remote(),indent=2))
 
 @app.function(image=image,timeout=600,volumes={'/data':volume})
@@ -55,7 +55,7 @@ def test():
         'tests/test_stage3_release_checks.py','tests/test_expansion_judge_json.py',
         'tests/test_expansion_numeric_normalization.py','tests/test_real_expansion_agent.py',
         'tests/test_harvest_expansion_trace.py','tests/test_packed_file_discovery.py',
-        'tests/test_expansion_semantic_review.py','-q'],
+        'tests/test_expansion_semantic_review.py','tests/test_pubmedqa_split.py','-q'],
         cwd='/opt/lclm',capture_output=True,text=True)
     report={'exit_code':result.returncode,'output':result.stdout+result.stderr}
     if result.returncode==0:
@@ -86,7 +86,7 @@ def test():
 
 @app.function(image=image,timeout=600,volumes={'/data':volume})
 def inspect_pilot(version:str,sources:str):
-    if version not in ['v4','v5']:raise ValueError('Unknown pilot version')
+    if version not in ['v4','v5','v6']:raise ValueError('Unknown pilot version')
     root=Path('/data/stage3-agent/real-expansion/pilots')/f'full-20260906-{version}-audit'
     out={}
     for path in sorted(root.glob('*.jsonl')):

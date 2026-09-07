@@ -128,9 +128,19 @@ def _finqa() -> tuple[list[dict[str, str]], list[dict[str, str]]]:
 
 def _pubmedqa() -> tuple[list[dict[str, str]], list[dict[str, str]]]:
     dataset = _load("pubmedqa_labeled/materialized/pqa_labeled/train")
+    # HF's single `train` split contains all 1,000 labeled examples, including
+    # the official test set. Filter before constructing the document pool too.
+    split_path = Path('/data/stage3-agent/real-expansion/sources/pubmedqa_labeled/official-splits/split-manifest.json')
+    if not split_path.exists():
+        raise RuntimeError('PubMedQA official training split has not been prepared')
+    split_manifest = json.loads(split_path.read_text())
+    from data.pubmedqa_split import training_ids
+    allowed = training_ids(split_manifest)
     documents = []
     candidates = []
     for index, row in enumerate(dataset):
+        if str(row.get('pubid')) not in allowed:
+            continue
         context = row.get("context") or {}
         contexts = context.get("contexts", []) if isinstance(context, dict) else []
         text = "\n\n".join(str(value) for value in contexts)

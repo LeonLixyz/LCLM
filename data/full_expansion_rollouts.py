@@ -19,7 +19,7 @@ def parse_judge_json(content):
     return value
 
 def generate_all(client,model,revision,root,commit,reload=None,concurrency=32,
-                 output_root=None,sources=None,pilot_limit=None):
+                 output_root=None,sources=None,pilot_limit=None,strict_semantics=False):
     from data.synthetic_expansion_agent import TEACHER_SYSTEM_PROMPT,messages_for_openai_api,run_agent_rollout,verify_trace
     from data.harvest_expansion_trace import harvest_training_messages
     from data.real_expansion_agent import verify_real_trace
@@ -36,6 +36,15 @@ def generate_all(client,model,revision,root,commit,reload=None,concurrency=32,
         'training_harvest':'native-calls-and-explicit-final-v1',
         'training_system_prompt_version':'document-task-v1',
         'pilot_limit':pilot_limit}
+    if strict_semantics:
+        from data.expansion_semantic_review import REVIEW_VERSION, CLAIM_REVIEW_VERSION
+        from data.pubmedqa_split import training_ids
+        split_path=Path('/data/stage3-agent/real-expansion/sources/pubmedqa_labeled/official-splits/split-manifest.json')
+        split_manifest=json.loads(split_path.read_text())
+        training_ids(split_manifest)
+        manifest.update(semantic_review=REVIEW_VERSION,summary_claim_review=CLAIM_REVIEW_VERSION,
+                        max_judge_tokens=2048,
+                        pubmedqa_split={'revision':split_manifest['revision'],'fold':0,'train_rows':450})
     path=output_root/'generation-manifest.json'
     if path.exists() and json.loads(path.read_text())!=manifest:raise RuntimeError('Incompatible resume settings')
     path.write_text(json.dumps(manifest,indent=2));commit()
@@ -64,6 +73,11 @@ def generate_all(client,model,revision,root,commit,reload=None,concurrency=32,
                 with p.open() as f:
                     for line in f:
                         r=json.loads(line);completed.add(r['task_id']);counts[r['verification']['reason']]+=1
+        if strict_semantics and source=='pubmedqa_labeled':
+            allowed=training_ids(split_manifest)
+            with task_path.open() as stream:
+                task_ids={json.loads(line)['source_row_id'] for line in stream}
+            if task_ids!=allowed:raise RuntimeError('PubMedQA task shard is not the official training set')
         def process(task):
             task=prepare_teacher_task(task,maud_choices)
             trace=None
@@ -82,7 +96,14 @@ def generate_all(client,model,revision,root,commit,reload=None,concurrency=32,
                 if source!='synthetic' and not trace.get('rollout_failure_reason'):
                     trace['verification']=verify_real_trace(task,trace['messages'])
                     verdict=trace['verification']
-                    if source in {'clapnq','faithdial','multidoc2dial','watsonx_docs_qa','billsum'} and (
+                    if strict_semantics:
+                        from data.expansion_semantic_review import apply_semantic_review
+                        def judge(messages):
+                            response=client.chat.completions.create(model=model,temperature=0,max_tokens=2048,messages=messages,
+                                extra_body={'chat_template_kwargs':{'enable_thinking':False}})
+                            return response.choices[0].message.content
+                        trace['verification']=apply_semantic_review(source,trace,judge)
+                    elif source in {'clapnq','faithdial','multidoc2dial','watsonx_docs_qa','billsum'} and (
                             verdict['reason'].startswith(('accepted:','wrong_answer:'))):
                         evidence='\n\n'.join(s['text'] for s in task['segments'] if s['segment_id'] in task['support_segment_ids'])
                         judged=client.chat.completions.create(model=model,temperature=0,max_tokens=512,

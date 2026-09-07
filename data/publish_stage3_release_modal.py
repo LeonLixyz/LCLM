@@ -38,9 +38,11 @@ def publish():
     for kind,transport in [('agents',native),('expansion',expansion)]:
         if sum(r['counts']['input_rows'] for r in reports[kind])!=transport['rows']:
             raise RuntimeError(f'Raw/packed input-count mismatch: {kind}')
-    generation_root=Path('/data/stage3-agent/real-expansion/pilots/full-20260906-v5')
+    generation_root=Path('/data/stage3-agent/real-expansion/pilots/full-20260906-v6')
     generation=json.loads((generation_root/'full-generation-report.json').read_text())
     if generation['status']!='complete':raise RuntimeError('Generation incomplete')
+    if generation['manifest'].get('pubmedqa_split',{}).get('train_rows')!=450:
+        raise RuntimeError('Expansion source split provenance is stale')
     # Source split/license and generated-data review must be recorded explicitly.
     review_path=ROOT/'release-review.json'
     if not review_path.exists() or json.loads(review_path.read_text()).get('approved') is not True:
