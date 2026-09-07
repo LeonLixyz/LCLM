@@ -53,7 +53,9 @@ Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
 
 Native cleaning and lossless JSON transport export are complete: **1,244,170
 trajectories**. All 64 native packing partitions completed successfully in app
-`ap-TW2Yn7nLWNb2qnOWkWMRkp` (read persistent reports for exact overlength exclusions).
+`ap-TW2Yn7nLWNb2qnOWkWMRkp`: **1,230,344 packed trajectories in 147,706 packs**,
+all uncompressed, with 1,273,215,572 labeled tokens. The other 13,826 raw
+trajectories exceed the 32,768-token packing limit; no other processing exclusions.
 
 | Native source/subset | Retained raw trajectories |
 | --- | ---: |
