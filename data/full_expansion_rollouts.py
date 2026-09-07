@@ -13,7 +13,8 @@ def generate_all(client,model,revision,root,commit,reload=None,concurrency=32):
     root.mkdir(parents=True,exist_ok=True)
     manifest={'model':'Qwen/Qwen3-235B-A22B-Instruct-2507','served_model_name':model,'model_revision':revision,'teacher_system_prompt':TEACHER_SYSTEM_PROMPT,
         'teacher_prompt_saved_in_training_messages':False,'max_tool_calls':16,
-        'max_tokens_per_turn':2048,'temperature':0,'concurrency':concurrency}
+        'max_tokens_per_turn':2048,'temperature':0,'concurrency':concurrency,
+        'segment_identity_headers':True}
     path=root/'generation-manifest.json'
     if path.exists() and json.loads(path.read_text())!=manifest:raise RuntimeError('Incompatible resume settings')
     path.write_text(json.dumps(manifest,indent=2));commit()
@@ -36,6 +37,15 @@ def generate_all(client,model,revision,root,commit,reload=None,concurrency=32):
                     for line in f:
                         r=json.loads(line);completed.add(r['task_id']);counts[r['verification']['reason']]+=1
         def process(task):
+            if source!='synthetic':
+                from data.synthetic_expansion_agent import format_training_user_prompt
+                # The teacher sees document identities in routing summaries.
+                # Include the same identities in the underlying memory source,
+                # so they are not privileged information missing at training.
+                for segment in task['segments']:
+                    segment['text']='SOURCE '+segment['record_id']+'\n'+segment['text']
+                task['training_user_prompt']=format_training_user_prompt(task['segments'],task['question'])
+                task['user_prompt']=task['training_user_prompt']
             def complete(messages,tools):
                 response=client.chat.completions.create(model=model,
                     messages=messages_for_openai_api(messages),tools=list(tools) if tools else None,

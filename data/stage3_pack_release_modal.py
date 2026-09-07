@@ -13,7 +13,7 @@ image=(modal.Image.debian_slim(python_version='3.11')
 
 @app.function(image=image,cpu=8,memory=32768,timeout=86400,max_containers=16,
               volumes={'/data':volume},secrets=[modal.Secret.from_name('huggingface')])
-def pack_partition(partition:int,total:int=64):
+def pack_partition(partition:int,total:int=64,kind:str='base'):
     import multiprocessing as mp
     import os
     import pickle
@@ -21,12 +21,14 @@ def pack_partition(partition:int,total:int=64):
     import pyarrow.parquet as pq
     from data.preprocess_for_dynamic_packing import (
         worker_init,worker_process_example,StreamingPacker,ParquetBatchWriter)
-    output=ROOT/'packed-base-cs16-32768'/f'part-{partition:03d}'
+    if kind not in ('base','agents','expansion'):raise ValueError('Unknown packing source')
+    output=ROOT/f'packed-{kind}-cs16-32768'/f'part-{partition:03d}'
     output.mkdir(parents=True,exist_ok=True)
     complete=output/'report.json'
     if complete.exists():return json.loads(complete.read_text())
-    files=sorted(Path('/data/stage3-final-mixture-cot50-v1').glob('*.parquet'))
-    if not files:raise RuntimeError('Missing completed reasoning rewrite')
+    source=Path('/data/stage3-final-mixture-cot50-v1') if kind=='base' else ROOT/f'{kind}-transport'
+    files=sorted(source.glob('*.parquet'))
+    if not files:raise RuntimeError('Missing completed input data')
     selected=files[partition::total]
     counts=Counter();source_counts=Counter()
     # Restart only this partition's explicitly named staging folder. Completed
@@ -78,6 +80,6 @@ def pack_partition(partition:int,total:int=64):
     return report
 
 @app.local_entrypoint()
-def main():
-    for report in pack_partition.map(range(64)):
+def main(kind:str='base'):
+    for report in pack_partition.starmap((i,64,kind) for i in range(64)):
         print(json.dumps({'partition':report['partition'],'counts':report['counts']}),flush=True)

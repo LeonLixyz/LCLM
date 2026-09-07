@@ -63,11 +63,45 @@ Commands use `/Users/leonli66/miniconda3/envs/modal/bin/modal` from this checkou
 - Expansion task build v3: `-m data.build_full_expansion_tasks_modal`,
   app `ap-UtHpSexNVfoX1VCij466Hs`.
 - Qwen teacher: `data/generate_real_expansion_modal.py --full`,
-  app `ap-1lg6UYUJIPBc62nK1hP0YB`. Teacher
+  app `ap-28zO9uYzlKe2iyeE8NvHPN`. Teacher
   `Qwen/Qwen3-235B-A22B-Instruct-2507`, revision
   `ac9c66cc9b46af7306746a9250f23d47083d689e`, H200:8.
   Expansion task/trace root:
   `/data/stage3-agent/real-expansion/pilots/full-20260906-v3`.
+
+The earlier teacher app was stopped during model startup. The replacement also
+puts document identity into the actual memory source, not only the teacher's
+routing summaries. Generation records this in its manifest.
+
+Nemotron v1 cleaning is complete: 335,122 input rows, 214,650 retained,
+including 199,207 tool_calling and 15,443 interactive_agent trajectories.
+It retained 382,594 tool calls. Rejections: 59,857 exact trajectory duplicates,
+15,104 conflicting schemas, 44,871 ambiguous result mappings, 601 missing
+responses, 7 invalid argument objects, and 32 unparsed reasoning markers.
+V2 and OpenThoughts cleaning are still pending completion.
+
+A same-task follow-up (`finish-stage-3-dataset-release`) is active every 30
+minutes to continue this work. It must stop after release completion. Keep the
+computer on and the app running for local continuation; Modal jobs run remotely.
+
+Next pipeline commands, after their input completion gates are satisfied:
+
+```sh
+modal run --detach -m data.export_stage3_agent_transport_modal --kind agents
+modal run --detach data/stage3_pack_release_modal.py --kind agents
+modal run --detach -m data.export_stage3_agent_transport_modal --kind expansion
+modal run --detach data/stage3_pack_release_modal.py --kind expansion
+modal run --detach -m data.publish_stage3_release_modal
+```
+
+The publisher intentionally requires all 64 partitions for each component and
+a final `/data/stage3-build-20260906/release-review.json` with `approved: true`.
+Only write that review record after inspecting source provenance, generated
+trajectories, packing counts, skips, and integration results. It is an internal
+verification gate, not a claim that the user reviewed the data. Proposed HF IDs:
+`leonli66/stage3-final-mixture-cot50-native-agent-v2` and
+`leonli66/stage3-final-mixture-cot50-native-agent-v2-packed-cs16-32k`.
+They have not been created or uploaded yet.
 
 Only v3 task builds are eligible for generation. Earlier v2 task artifacts are
 unreleased diagnostics: short-document distractors and ambiguous document
