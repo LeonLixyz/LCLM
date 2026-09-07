@@ -49,7 +49,7 @@ removed, while retaining its task and final-answer contract.
 Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
 `/data/stage3-build-20260906/validation/` on the data volume.
 
-## Latest checkpoint — 2026-09-07 02:58 EDT
+## Latest checkpoint — 2026-09-07 02:56 EDT
 
 - Full V6 generation remains active in `ap-AClcBdi6IpX7cwvr24zc0m`; do not
   duplicate it. Latest inspected MAUD progress: **3,200 attempted / 802 accepted**,
