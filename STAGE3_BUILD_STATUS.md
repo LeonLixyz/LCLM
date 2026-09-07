@@ -49,7 +49,39 @@ removed, while retaining its task and final-answer contract.
 Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
 `/data/stage3-build-20260906/validation/` on the data volume.
 
-## Latest checkpoint — 2026-09-07 15:21 EDT
+## Latest checkpoint — 2026-09-07 17:10 EDT — awaiting cancellation clarification
+
+- **The resumed GPU app stopped again. Do not automatically restart it until
+  the user clarifies whether these cancellations were intentional.** App
+  `ap-UXSWSfrR3pbU6soJrhFl1B` received an input cancellation signal at
+  **19:52:20 UTC / 15:52 EDT**, then stopped at 15:53:28 EDT. It was processing
+  requests normally immediately beforehand. No inference-error cause appears
+  in the inspected log tail; cancellation initiator is unknown. This is the
+  second full-generation cancellation, despite using detached mode.
+- Latest persisted MultiDoc2Dial progress report: 8,300 new attempts after
+  resume, **16,415 cumulative attempts / 9,873 accepted**. Together with the
+  eight completed sources this reports **77,395 attempts / 35,133 accepted**.
+  These are checkpoint-reported counts; audit actual JSONL again before any
+  authorized resume because additional rows may have flushed after the report.
+- Base-mixture provenance gap: HF's original `leonli66/stage3-final-mixture`
+  has no dataset card or license declaration. Local searches of LCLM and the
+  sibling project code found the rewrite/audit scripts, but not its original
+  37-subset construction manifest. Asked the user for the build script/source
+  mapping. Source evidence: https://huggingface.co/datasets/leonli66/stage3-final-mixture
+- Removed the unsupported blanket `license: apache-2.0` declaration from the
+  legacy CoT-only uploader's card template; it now explicitly preserves upstream
+  terms. No existing HF repository was changed by this edit.
+- Added `modal run --detach -m data.stage3_provenance_modal --base` to inspect
+  raw subset counts and cached download revisions. Attempt
+  `ap-CkELuqTPjHgBWBdhO6LXw5` was also cancelled (20:08:44 UTC) and stopped;
+  **no `base-source-provenance-inspection.json` exists**. Runtime validation of
+  that inspector is pending. Do not claim the original base terms are cleared.
+- Source notices, eight completed full-format audits, base/native/recovery
+  packs and TechQA supplemental prompts remain saved. No HF release exists.
+  Next: obtain cancellation clarification; then inspect/checkpoint-audit before
+  restarting. Read-only provenance investigation can continue meanwhile.
+
+## Historical checkpoint — 2026-09-07 15:21 EDT
 
 - Full V6 teacher remains active in `ap-UXSWSfrR3pbU6soJrhFl1B`. Latest inspected
   MultiDoc2Dial checkpoint: **13,315 cumulative attempts / 7,910 accepted**

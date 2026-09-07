@@ -26,7 +26,6 @@ app = modal.App(APP_NAME)
 
 DATASET_CARD = """---
 pretty_name: Stage 3 Final Mixture — 50% CoT Compression
-license: apache-2.0
 task_categories:
 - text-generation
 ---
@@ -35,6 +34,9 @@ task_categories:
 
 This is a deterministic capability-preserving rewrite of
 `leonli66/stage3-final-mixture` for LCLM Stage-3 post-training.
+
+This transformation does not relicense the original mixture. Its constituent
+sources retain their own terms; no blanket Apache-2.0 data license is asserted.
 
 Only the `reasoning_data` and `dolci_think` subsets change. Their
 `compression_prompt` is the ordinary `prompt`. A deterministic 50% arm keeps
@@ -158,5 +160,4 @@ def upload() -> dict[str, object]:
 @app.local_entrypoint()
 def main() -> None:
     print(json.dumps(upload.remote(), indent=2, sort_keys=True))
-
 

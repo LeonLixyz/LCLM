@@ -70,5 +70,42 @@ def inspect_techqa():
     return result
 
 @app.local_entrypoint()
-def main(techqa:bool=False):
-    print(json.dumps(inspect_techqa.remote() if techqa else assemble.remote(),indent=2))
+def main(techqa:bool=False,base:bool=False):
+    if techqa and base:raise ValueError('Choose one inspection mode')
+    print(json.dumps(inspect_base.remote() if base else inspect_techqa.remote() if techqa else assemble.remote(),indent=2))
+
+
+@app.function(image=image,cpu=4,memory=8192,timeout=1800,volumes={'/data':volume})
+def inspect_base():
+    import re
+    from collections import Counter
+    import pyarrow.parquet as pq
+    from huggingface_hub import HfApi
+    source=Path('/data/stage3-final-mixture')
+    files=sorted(source.glob('*.parquet'));counts=Counter();metadata_rows=0
+    revisions=Counter();missing_receipts=[]
+    for path in files:
+        parquet=pq.ParquetFile(path)
+        metadata_rows+=parquet.metadata.num_rows
+        for batch in parquet.iter_batches(batch_size=65536,columns=['sub_dataset']):
+            counts.update(batch.column(0).to_pylist())
+        receipt=source/'.cache/huggingface/download'/(path.name+'.metadata')
+        if receipt.exists():
+            commit=receipt.read_text().splitlines()[0]
+            if not re.fullmatch('[0-9a-f]{40}',commit):raise ValueError('Unknown download receipt format')
+            revisions[commit]+=1
+        else:missing_receipts.append(path.name)
+    if not files or metadata_rows!=sum(counts.values()):raise ValueError('Base row accounting mismatch')
+    cards={}
+    for revision in revisions:
+        info=HfApi().dataset_info('leonli66/stage3-final-mixture',revision=revision)
+        cards[revision]={'sha':info.sha,'card_data':info.card_data.to_dict() if info.card_data else {},
+            'metadata_files':[s.rfilename for s in info.siblings
+                if s.rfilename.lower().startswith(('readme','license','notice','copying'))]}
+    report={'status':'inspected','approved':False,'source':'leonli66/stage3-final-mixture',
+        'parquet_shards':len(files),'rows':metadata_rows,'sub_dataset_counts':dict(sorted(counts.items())),
+        'download_receipt_revisions':dict(revisions),'missing_download_receipts':missing_receipts,
+        'pinned_source_cards':cards,
+        'limits':'Sub-dataset labels are not upstream IDs or license declarations. Original mixture build/source mapping is still required for complete attribution review.'}
+    (ROOT/'base-source-provenance-inspection.json').write_text(json.dumps(report,indent=2));volume.commit()
+    return report
