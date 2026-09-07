@@ -1,5 +1,27 @@
 """Pure count checks shared by release publication and tests."""
 
+def validate_expansion_format_audits(audits, source_reports, manifest_sha256):
+    import re
+    from data.stage3_tokenizers import DECODER_REVISION, ENCODER_REVISION
+    expected = {r['source']:sum(v for k,v in r['reasons'].items() if k.startswith('accepted'))
+                for r in source_reports}
+    actual = {r['source']:r for r in audits}
+    if (not expected or len(expected) != len(source_reports) or len(actual) != len(audits)
+            or set(actual) != set(expected)):
+        raise ValueError('Full expansion format audit source coverage mismatch')
+    for source, count in expected.items():
+        r = actual[source]
+        if (r.get('status') != 'passed' or r.get('rows') != count
+                or r.get('expected_accepted') != count or r.get('counts',{}).get('accepted') != count
+                or r.get('failed_rows') != 0 or r.get('errors') != []
+                or r.get('generation_manifest_file_sha256') != manifest_sha256
+                or r.get('decoder_tokenizer_revision') != DECODER_REVISION
+                or r.get('encoder_tokenizer_revision') != ENCODER_REVISION
+                or not re.fullmatch(r'[0-9a-f]{64}',r.get('accepted_file_sha256',''))
+                or (count and (r.get('minimum_segment_tokens') or 0) < 512)):
+            raise ValueError(f'Incomplete/stale expansion format audit: {source}')
+    return actual
+
 def validate_final_artifact_audit(audit):
     required = {'base', 'agents', 'base_recovery', 'expansion'}
     components = audit.get('components', [])

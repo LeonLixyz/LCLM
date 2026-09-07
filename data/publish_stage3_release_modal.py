@@ -11,8 +11,9 @@ PACKED_REPO=RAW_REPO+'-packed-cs16-32k'
 @app.function(image=image,cpu=8,memory=32768,timeout=86400,volumes={'/data':volume},
               secrets=[modal.Secret.from_name('huggingface')])
 def publish():
+    import hashlib
     from huggingface_hub import HfApi
-    from data.stage3_release_checks import validate_base_recovery,validate_expansion_completion,validate_final_artifact_audit
+    from data.stage3_release_checks import validate_base_recovery,validate_expansion_completion,validate_final_artifact_audit,validate_expansion_format_audits
     reports={}
     for kind in ('base','agents','expansion'):
         root=ROOT/f'packed-{kind}-cs16-32768'
@@ -48,6 +49,8 @@ def publish():
     provenance=json.loads((ROOT/'expansion-source-provenance.json').read_text())
     source_reports=[json.loads((generation_root/(r['source']+'.generation.json')).read_text()) for r in provenance['sources']]
     generation_counts=validate_expansion_completion(generation,source_reports,provenance)
+    validate_expansion_format_audits(expansion.get('format_audits',[]),source_reports,
+        hashlib.sha256((generation_root/'generation-manifest.json').read_bytes()).hexdigest())
     if expansion['rows']!=generation_counts['accepted']:
         raise RuntimeError('Expansion generation/export count mismatch')
     # Source split/license and generated-data review must be recorded explicitly.
@@ -76,6 +79,7 @@ def publish():
         'native_rows':native['rows'],'expansion_rows':expansion['rows'],'packing':reports,
         'base_combined_counts':base_counts,
         'expansion_generation_counts':generation_counts,
+        'expansion_format_audits':expansion['format_audits'],
         'expansion_source_provenance':provenance,
         'source_revisions':json.loads((ROOT/'agent-source-manifest.json').read_text()),
         'validation':validation,'packed_artifact_audit':artifact_audit,

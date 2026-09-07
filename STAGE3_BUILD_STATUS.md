@@ -49,7 +49,41 @@ removed, while retaining its task and final-answer contract.
 Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
 `/data/stage3-build-20260906/validation/` on the data volume.
 
-## Latest checkpoint — 2026-09-07 14:13 EDT
+## Latest checkpoint — 2026-09-07 14:22 EDT
+
+- Resumed teacher **healthy and generating** in `ap-UXSWSfrR3pbU6soJrhFl1B`.
+  vLLM began serving at 18:15:23 UTC and active inference was observed. Latest
+  inspected MultiDoc2Dial checkpoint: **8,415 cumulative attempts / 4,734
+  accepted**, including 300 new attempts after resume. Its `processed` field
+  counts new attempts this run; sum `reasons` for cumulative attempts.
+- New full-format audit checks every accepted trace in each completed source,
+  using pinned decoder/encoder tokenizers and bounded CPU worker pools on Modal.
+  It verifies original expand bodies, tool schema/arguments, saved task system,
+  teacher separation, harvested assistant content, all segment lengths >=512,
+  source verifier/semantic-vote conditions, PubMed train-only document IDs and
+  independently computed assistant-only labels for every tool call/answer.
+- **All 25,260 accepted traces in the eight completed sources passed**, not just
+  a sample. **8,983 multi-segment-expansion traces**, 40,996 native calls; minimum
+  segment length **624 Qwen tokens**. PubMedQA + CLAPNQ audit:
+  `ap-wCzE0z01UxdgM4WcH5rXNL`; other six completed sources:
+  `ap-QcnoKOJflRERNtXqYvsqXb`. Both audit apps finished. Reports are under
+  `/data/stage3-build-20260906/full-expansion-format-audit/<source>.json`.
+  Free-form semantic judgments remain heuristics, not correctness guarantees.
+- Export now requires complete source audit coverage, matching generation
+  manifest/tokenizer revisions/counts, and the SHA256 of each actual accepted
+  JSONL file to match its audit. Publication rechecks the exported audit receipts.
+  This prevents pilot-only, stale or partial audit reports from passing release.
+- Focused tests: **130 passed** plus eight real-Qwen boundary cases,
+  `ap-274IWziLRspjOn0xZyVoZe`. New tests cover corrupt expand bodies, tool/schema
+  problems, missing system, preambles, label mistakes and stale audit gates.
+- Next: leave the resumed teacher running; audit subsequent sources only after
+  their generation reports are complete. Run
+  `modal run --detach -m data.audit_full_expansion_modal --sources <comma-separated-newly-complete-sources>`.
+  Do not rerun the eight passed source audits unless files or audit rules change.
+  Then finish source-stratified semantic review, export, packing, final packed
+  artifact/GPU validation and source-notice review. **No HF release yet.**
+
+## Historical checkpoint — 2026-09-07 14:13 EDT
 
 - Original full V6 app `ap-AClcBdi6IpX7cwvr24zc0m` **stopped at 11:33 EDT**.
   Logs show an input cancellation signal at 15:32:53 UTC, followed by worker

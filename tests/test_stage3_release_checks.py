@@ -4,6 +4,35 @@ from data.stage3_release_checks import validate_base_recovery
 from data.stage3_release_checks import validate_expansion_completion
 from data.stage3_release_checks import validate_pilot_review
 from data.stage3_release_checks import validate_final_artifact_audit
+from data.stage3_release_checks import validate_expansion_format_audits
+
+
+def format_audits():
+    from data.stage3_tokenizers import DECODER_REVISION, ENCODER_REVISION
+    return ([{'source':'source','status':'passed','rows':2,'expected_accepted':2,
+        'counts':{'accepted':2},'failed_rows':0,'errors':[],
+        'generation_manifest_file_sha256':'a'*64,'accepted_file_sha256':'b'*64,
+        'decoder_tokenizer_revision':DECODER_REVISION,'encoder_tokenizer_revision':ENCODER_REVISION,
+        'minimum_segment_tokens':512}], [{'source':'source','reasons':{'accepted:exact':2}}], 'a'*64)
+
+
+def test_full_format_audit_binds_counts_manifest_and_tokenizers():
+    assert set(validate_expansion_format_audits(*format_audits())) == {'source'}
+
+
+@pytest.mark.parametrize('field,value', [('status','failed'),('rows',1),('expected_accepted',3),
+    ('failed_rows',1),('errors',[{'error':'bad row'}]),('generation_manifest_file_sha256','stale'),
+    ('decoder_tokenizer_revision','main'),('encoder_tokenizer_revision','main'),
+    ('accepted_file_sha256','missing'),('minimum_segment_tokens',511)])
+def test_full_format_audit_rejects_stale_or_partial_reports(field,value):
+    audits,sources,digest=format_audits();audits[0][field]=value
+    with pytest.raises(ValueError):validate_expansion_format_audits(audits,sources,digest)
+
+
+def test_full_format_audit_requires_all_unique_sources():
+    audits,sources,digest=format_audits()
+    for bad in ([],audits*2):
+        with pytest.raises(ValueError):validate_expansion_format_audits(bad,sources,digest)
 
 
 def test_final_artifact_audit_requires_expansion():

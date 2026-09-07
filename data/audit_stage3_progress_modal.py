@@ -52,6 +52,9 @@ def audit():
     completion=full/'full-generation-report.json'
     if completion.exists():
         out['full_v6_completion']=json.loads(completion.read_text())
+    out['full_expansion_format']={p.stem:{k:v for k,v in json.loads(p.read_text()).items()
+        if k in ('status','rows','counts','failed_rows','minimum_segment_tokens')}
+        for p in sorted((ROOT/'full-expansion-format-audit').glob('*.json'))}
     (ROOT/'progress-audit.json').write_text(json.dumps(out,indent=2));volume.commit()
     return out
 
@@ -68,7 +71,8 @@ def test():
         'tests/test_expansion_numeric_normalization.py','tests/test_real_expansion_agent.py',
         'tests/test_harvest_expansion_trace.py','tests/test_packed_file_discovery.py',
         'tests/test_expansion_semantic_review.py','tests/test_pubmedqa_split.py',
-        'tests/test_techqa_adapter.py','tests/test_expansion_checkpoint_audit.py','-q'],
+        'tests/test_techqa_adapter.py','tests/test_expansion_checkpoint_audit.py',
+        'tests/test_expansion_trace_audit.py','-q'],
         cwd='/opt/lclm',capture_output=True,text=True)
     report={'exit_code':result.returncode,'output':result.stdout+result.stderr}
     if result.returncode==0:
