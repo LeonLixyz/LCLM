@@ -161,9 +161,25 @@ class RealExpansionGenerator:
         from openai import OpenAI
         from data.full_expansion_rollouts import generate_all
         data_volume.reload()
+        audit_path=DATA_ROOT/'full-20260906-v5-audit'/'pilot-generation-report.json'
+        if not audit_path.exists():raise RuntimeError('Complete and inspect the source-stratified pilot first')
+        review_path=DATA_ROOT/'full-20260906-v5-audit'/'review-passed.json'
+        if not review_path.exists() or json.loads(review_path.read_text()).get('approved') is not True:
+            raise RuntimeError('Source-stratified pilot review has not passed')
         client=OpenAI(api_key='not-needed',base_url=f'http://127.0.0.1:{MODEL_PORT}/v1',timeout=300,max_retries=2)
         return generate_all(client,SERVED_MODEL_NAME,MODEL_REVISION,
-            DATA_ROOT/'full-20260906-v3',data_volume.commit,data_volume.reload)
+            DATA_ROOT/'full-20260906-v3',data_volume.commit,data_volume.reload,
+            output_root=DATA_ROOT/'full-20260906-v5')
+
+    @modal.method()
+    def audit_full(self) -> dict[str, Any]:
+        from openai import OpenAI
+        from data.full_expansion_rollouts import generate_all
+        data_volume.reload()
+        client=OpenAI(api_key='not-needed',base_url=f'http://127.0.0.1:{MODEL_PORT}/v1',timeout=300,max_retries=2)
+        return generate_all(client,SERVED_MODEL_NAME,MODEL_REVISION,
+            DATA_ROOT/'full-20260906-v3',data_volume.commit,data_volume.reload,
+            output_root=DATA_ROOT/'full-20260906-v5-audit',pilot_limit=32)
 
     @modal.method()
     def generate(
@@ -336,7 +352,11 @@ def main(
     max_tool_calls: int = 4,
     temperature: float = 0.0,
     full: bool = False,
+    audit_full: bool = False,
 ) -> None:
+    if audit_full:
+        print(json.dumps(RealExpansionGenerator().audit_full.remote(),indent=2))
+        return
     if full:
         print(json.dumps(RealExpansionGenerator().generate_full.remote(),indent=2))
         return

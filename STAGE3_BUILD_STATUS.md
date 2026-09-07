@@ -49,36 +49,96 @@ removed, while retaining its task and final-answer contract.
 Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
 `/data/stage3-build-20260906/validation/` on the data volume.
 
-## Active work
+## Latest checkpoint — 2026-09-07 00:43 EDT
+
+Native cleaning and lossless JSON transport export are complete: **1,244,170
+trajectories**. All 64 native packing partitions completed successfully in app
+`ap-TW2Yn7nLWNb2qnOWkWMRkp` (read persistent reports for exact overlength exclusions).
+
+| Native source/subset | Retained raw trajectories |
+| --- | ---: |
+| Nemotron v1 tool_calling | 199,207 |
+| Nemotron v1 interactive_agent | 15,443 |
+| Nemotron v2 tool_calling | 696,224 |
+| Nemotron v2 search | 5,953 |
+| Nemotron v2 interactive_agent | 278,592 |
+| OpenThoughts main + terminal | 48,751 |
+
+V2 retains 2,640,245 tool calls; v1 retains 382,594; OpenThoughts retains 525,121.
+Native JSONL is in `agents-qwen-v2`, and Arrow-safe JSON-string transport is in
+`agents-transport`, both under `/data/stage3-build-20260906`.
+
+The original base packing app stopped after 49/64 partitions. Fifteen unfinished
+partitions had partial outputs; two sampled files had missing Parquet footers.
+All partial folders were inspected and **moved, not deleted**, to
+`quarantine-base-partials/`; exact paths/metadata are in
+`base-resume-inspection.json`. Completed outputs were untouched.
+Baseline resume app **`ap-PTjkWElexk2FIJc34t3uC5`** is running only unfinished
+partitions, launched with `LCLM_PACK_JOB=base-resume`.
+
+An additional legacy SFT BPE/newline bug rejected valid reasoning responses.
+The recovery pass is complete: all 20,326,114 input rows scanned, 527,286
+whitespace-prefix candidates, **334,260 recovered/packed rows**, 977 overlength,
+192,049 not recoverable by this fix. Outputs:
+`packed-base-prefix-recovery/part-###/all_samples` and reports. The baseline retry
+explicitly retains the old prefix eligibility rule; the separate recovery pass
+includes only mismatches, so those rows cannot be duplicated. Publication now
+requires all 64 recovery reports and combined per-partition accounting checks.
+
+Latest focused validation: **48 tests passed** on Modal, plus eight real pinned
+Qwen tokenizer boundary cases. Report `validation/prefix-recovery-tests.json`.
+This supplements, not replaces, the earlier 118-test and NCCL/FSDP GPU evidence.
+
+### Expansion generation remains gated
+
+All 15 implemented source task builders completed: **375,305 tasks**, including
+10,000 synthetic tasks. This is a prompt-task count, NOT accepted training traces.
+Task input root remains `/data/stage3-agent/real-expansion/pilots/full-20260906-v3`.
+
+The old full teacher app `ap-28zO9uYzlKe2iyeE8NvHPN` was STOPPED after roughly
+3,000 MAUD rejects and zero accepted rows. MAUD lacked explicit label choices
+(e.g. teacher answered cash while the label was All Cash). These are diagnostics.
+
+Source-stratified pilot app `ap-ZiiXioSeQVo9F4zwGqdfmw` completed 32 tasks per
+source, **480 attempted / 224 accepted by the then-current verifier**. Outputs
+are in `full-20260906-v4-audit`; do not release these as final data. Pilot review
+found issues requiring fixes before a new pilot:
+
+- MAUD label ontology now appears identically in teacher and saved task inputs.
+- ACORD qrels are 0–4, not 1–5 stars. Its v4 pilot had zero accepted rows. The
+  normalization now fixes the question without changing the source gold label.
+  Evidence: https://huggingface.co/datasets/theatticusproject/acord
+- Judge JSON now accepts complete fenced JSON, but still rejects malformed or
+  non-boolean votes. The v4 pilot had 26 JSON decode failures; not all necessarily
+  come from code fences, so inspect v5 outcomes.
+- Exact-answer normalization now preserves signs, decimal punctuation and
+  percentage units. Previously negative and positive answers could compare equal.
+- Financial strict comparisons reject arithmetic errors, rounding differences,
+  and scale differences. Do not loosen them blindly to raise acceptance.
+- Some accepted teacher responses contain explanatory computation before their
+  FINAL line despite the teacher instruction. Before full release, decide and
+  implement final-line-only harvesting (preserving all tool calls), reverify the
+  actual saved training messages, and test it. Do not silently call these no-CoT.
+- Support currently means all chunks of the source document, not minimal
+  evidence. This is conservative but may discard otherwise grounded trajectories.
+- LLM reference/evidence judgment can accept noisy references. It is heuristic;
+  manually inspect accepted free-form samples and record limitations.
+
+Code targets the next pilot at **`full-20260906-v5-audit`** and full output at
+**`full-20260906-v5`**, separate from v4 diagnostics. Neither v5 job has been
+launched at this checkpoint. Full generation requires the pilot report and an
+explicit `review-passed.json` with `approved: true`, written only after review.
+Do not restart full generation merely because a pilot job completed.
+
+## Commands and continuation
 
 Commands use `/Users/leonli66/miniconda3/envs/modal/bin/modal` from this checkout.
 
-- Native cleaning: `data/stage3_full_modal.py --action clean-agents`,
-  app `ap-D9EQ445kdWpi65wyiyc9LG`; outputs `agents-qwen-v2` under the build root.
-- Base packing: `data/stage3_pack_release_modal.py`,
-  app `ap-vFCwnWaCX5lImxkgXdTUqF`; 64 partitions, at most 16 containers.
-  Input `/data/stage3-final-mixture-cot50-v1`: 20,326,114 rows, including the
-  previously completed 50/50 reasoning rewrite. Output
-  `/data/stage3-build-20260906/packed-base-cs16-32768`.
-- Expansion task build v3: `-m data.build_full_expansion_tasks_modal`,
-  app `ap-UtHpSexNVfoX1VCij466Hs`.
-- Qwen teacher: `data/generate_real_expansion_modal.py --full`,
-  app `ap-28zO9uYzlKe2iyeE8NvHPN`. Teacher
-  `Qwen/Qwen3-235B-A22B-Instruct-2507`, revision
+- Read bounded progress with `modal run -m data.audit_stage3_progress_modal`.
+- Run focused + real-tokenizer tests with the same command plus `--tests`.
+- Inspect selected pilot examples with `--samples --version v4 --sources finqa,clapnq`.
+- Teacher model stays `Qwen/Qwen3-235B-A22B-Instruct-2507`, revision
   `ac9c66cc9b46af7306746a9250f23d47083d689e`, H200:8.
-  Expansion task/trace root:
-  `/data/stage3-agent/real-expansion/pilots/full-20260906-v3`.
-
-The earlier teacher app was stopped during model startup. The replacement also
-puts document identity into the actual memory source, not only the teacher's
-routing summaries. Generation records this in its manifest.
-
-Nemotron v1 cleaning is complete: 335,122 input rows, 214,650 retained,
-including 199,207 tool_calling and 15,443 interactive_agent trajectories.
-It retained 382,594 tool calls. Rejections: 59,857 exact trajectory duplicates,
-15,104 conflicting schemas, 44,871 ambiguous result mappings, 601 missing
-responses, 7 invalid argument objects, and 32 unparsed reasoning markers.
-V2 and OpenThoughts cleaning are still pending completion.
 
 A same-task follow-up (`finish-stage-3-dataset-release`) is active every 30
 minutes to continue this work. It must stop after release completion. Keep the
@@ -87,14 +147,16 @@ computer on and the app running for local continuation; Modal jobs run remotely.
 Next pipeline commands, after their input completion gates are satisfied:
 
 ```sh
-modal run --detach -m data.export_stage3_agent_transport_modal --kind agents
-modal run --detach data/stage3_pack_release_modal.py --kind agents
+modal run --detach data/generate_real_expansion_modal.py --audit-full
+# Only after reviewing the new pilot:
+modal run --detach data/generate_real_expansion_modal.py --full
 modal run --detach -m data.export_stage3_agent_transport_modal --kind expansion
-modal run --detach data/stage3_pack_release_modal.py --kind expansion
+LCLM_PACK_JOB=expansion modal run --detach data/stage3_pack_release_modal.py --kind expansion
 modal run --detach -m data.publish_stage3_release_modal
 ```
 
-The publisher intentionally requires all 64 partitions for each component and
+The publisher intentionally requires all 64 partitions for each component,
+including separate base recovery, and
 a final `/data/stage3-build-20260906/release-review.json` with `approved: true`.
 Only write that review record after inspecting source provenance, generated
 trajectories, packing counts, skips, and integration results. It is an internal

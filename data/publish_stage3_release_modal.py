@@ -12,6 +12,7 @@ PACKED_REPO=RAW_REPO+'-packed-cs16-32k'
               secrets=[modal.Secret.from_name('huggingface')])
 def publish():
     from huggingface_hub import HfApi
+    from data.stage3_release_checks import validate_base_recovery
     reports={}
     for kind in ('base','agents','expansion'):
         root=ROOT/f'packed-{kind}-cs16-32768'
@@ -21,15 +22,23 @@ def publish():
         for report in reports[kind]:
             if report['counts'].get('packed_rows')!=report['counts'].get('eligible_rows'):
                 raise RuntimeError(f'Packing count mismatch: {kind}')
+    recovery_root=ROOT/'packed-base-prefix-recovery'
+    recovery_paths=[recovery_root/f'part-{i:03d}'/'report.json' for i in range(64)]
+    if not all(p.exists() for p in recovery_paths):raise RuntimeError('Base prefix recovery incomplete')
+    reports['base_recovery']=[json.loads(p.read_text()) for p in recovery_paths]
+    base_counts=validate_base_recovery(reports['base'],reports['base_recovery'])
     validation=json.loads((ROOT/'validation/report.json').read_text())
     if not {'pytest','nccl','fsdp'}<=set(r['check'] for r in validation) or any(r['exit_code'] for r in validation):
         raise RuntimeError('Validation gate is not green')
+    prefix_tests=json.loads((ROOT/'validation/prefix-recovery-tests.json').read_text())
+    if prefix_tests['exit_code'] or len(prefix_tests.get('real_tokenizer_boundary_cases',[]))!=8:
+        raise RuntimeError('Prefix-recovery validation is not green')
     native=json.loads((ROOT/'agents-transport/report.json').read_text())
     expansion=json.loads((ROOT/'expansion-transport/report.json').read_text())
     for kind,transport in [('agents',native),('expansion',expansion)]:
         if sum(r['counts']['input_rows'] for r in reports[kind])!=transport['rows']:
             raise RuntimeError(f'Raw/packed input-count mismatch: {kind}')
-    generation_root=Path('/data/stage3-agent/real-expansion/pilots/full-20260906-v3')
+    generation_root=Path('/data/stage3-agent/real-expansion/pilots/full-20260906-v5')
     generation=json.loads((generation_root/'full-generation-report.json').read_text())
     if generation['status']!='complete':raise RuntimeError('Generation incomplete')
     # Source split/license and generated-data review must be recorded explicitly.
@@ -49,11 +58,14 @@ def publish():
                 path_in_repo=f'native-jsonl/{kind}/{Path(file).name}')
     for kind in reports:
         for i in range(64):
-            folder=ROOT/f'packed-{kind}-cs16-32768'/f'part-{i:03d}'/'all_samples'
+            packed_root=recovery_root if kind=='base_recovery' else ROOT/f'packed-{kind}-cs16-32768'
+            folder=packed_root/f'part-{i:03d}'/'all_samples'
+            if not list(folder.glob('*.parquet')):continue
             api.upload_folder(repo_id=PACKED_REPO,repo_type='dataset',folder_path=folder,
                 path_in_repo=f'data/{kind}/part-{i:03d}',allow_patterns=['*.parquet'],ignore_patterns=['state.json'])
     summary={'raw_repo':RAW_REPO,'packed_repo':PACKED_REPO,
         'native_rows':native['rows'],'expansion_rows':expansion['rows'],'packing':reports,
+        'base_combined_counts':base_counts,
         'source_revisions':json.loads((ROOT/'agent-source-manifest.json').read_text()),
         'validation':validation,'review':json.loads(review_path.read_text())}
     for repo in (RAW_REPO,PACKED_REPO):
@@ -114,6 +126,9 @@ Load with LCLM DynamicPackedDataset. Each parquet row contains packed_batch_byte
 labels are precomputed; memory strings are encoder-tokenized at runtime. Reference
 compression ratio is 16. Packed length limit is 32768. Use all_samples, not only
 exactly full packs. Overlength and invalid exclusions are reported in the manifest.
+The base_recovery packed shard group contains only legacy SFT rows rejected by
+the original token-prefix boundary check. It supplements base without duplicating
+originally valid rows; base_combined_counts counts each input row once.
 
 See the companion raw collection and build-manifest.json for source licenses,
 provenance, counts, validation limits and per-partition statistics.

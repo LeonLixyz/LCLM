@@ -1,4 +1,5 @@
 import json
+import pytest
 
 import data.preprocess_for_dynamic_packing as preprocessing
 
@@ -85,6 +86,62 @@ def _install_worker_tokenizer(monkeypatch):
     monkeypatch.setattr(preprocessing, "_worker_memory_id", 102)
     monkeypatch.setattr(preprocessing, "_worker_memory_end_id", 103)
     return tokenizer
+
+
+class FastNewlineTokenizer(FakeQwenTokenizer):
+    is_fast = True
+
+    def __call__(self, text, **kwargs):
+        ids, offsets = [], []
+        cursor = 0
+        while cursor < len(text):
+            end = cursor + (2 if text[cursor:cursor+2] == '\n\n' else 1)
+            ids.append(999999 if end-cursor == 2 else 1000+ord(text[cursor]))
+            offsets.append((cursor, end))
+            cursor = end
+        return {'input_ids': ids, 'offset_mapping': offsets}
+
+    def encode(self, text, **kwargs):
+        return self(text)['input_ids']
+
+
+def test_sft_recovers_newline_boundary_and_masks_merged_token():
+    tokenizer = FastNewlineTokenizer()
+    row = {'compression_prompt': [{'role': 'user', 'content': 'question'}],
+           'target': '\nanswer', '_recover_prefix_only': True}
+    ids, labels, memories, boundary = preprocessing.process_sft_example(row, tokenizer)
+    assert memories == []
+    assert ids[boundary-1] == 999999
+    assert all(x == -100 for x in labels[:boundary])
+    assert ''.join(chr(x-1000) for x in labels[boundary:]) == 'answer<|im_end|>\n'
+    del row['_recover_prefix_only']
+    assert preprocessing.process_sft_example(row, tokenizer)[1] == labels
+
+
+def test_sft_recovery_does_not_duplicate_already_valid_rows():
+    row = {'compression_prompt': [{'role': 'user', 'content': 'question'}],
+           'target': 'answer', '_recover_prefix_only': True}
+    assert preprocessing.process_sft_example(row, FastNewlineTokenizer()) is None
+
+
+def test_legacy_baseline_retry_keeps_recovery_rows_separate():
+    row = {'compression_prompt': [{'role': 'user', 'content': 'question'}],
+           'target': '\nanswer', '_legacy_sft_prefix_strict': True}
+    assert preprocessing.process_sft_example(row, FastNewlineTokenizer()) is None
+    row['target'] = 'answer'
+    assert preprocessing.process_sft_example(row, FastNewlineTokenizer()) is not None
+
+
+def test_sft_rejects_inconsistent_offset_tokenization():
+    class BadOffsets(FastNewlineTokenizer):
+        def __call__(self, text, **kwargs):
+            result = super().__call__(text, **kwargs)
+            if kwargs.get('return_offsets_mapping'):
+                result['input_ids'][0] += 1
+            return result
+    row = {'compression_prompt': [{'role': 'user', 'content': 'q'}], 'target': '\na'}
+    with pytest.raises(ValueError, match='offset tokenization'):
+        preprocessing.process_sft_example(row, BadOffsets())
 
 
 def test_native_json_transport_matches_object_input(monkeypatch):

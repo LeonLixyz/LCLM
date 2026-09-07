@@ -230,7 +230,9 @@ def validate_real_task(task: Mapping[str, Any]) -> None:
 
 
 def _normalized_tokens(text: str) -> list[str]:
-    return re.findall(r"[a-z0-9]+", text.casefold())
+    # Preserve numeric signs, decimal points and percentage units. Dropping
+    # punctuation made -23 and +23 indistinguishable in financial answers.
+    return re.findall(r"[-+]?\d+(?:[.,]\d+)*%?|[a-z]+", text.casefold())
 
 
 def _final_payload(messages: Sequence[Mapping[str, Any]]) -> str:

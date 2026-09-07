@@ -1,11 +1,12 @@
 """Resumable, bounded-memory packing of the Stage-3 rebuild on its data volume."""
 import json
+import os
 from pathlib import Path
 import modal
 
 ROOT=Path('/data/stage3-build-20260906')
 volume=modal.Volume.from_name('lclm-stage3-data')
-app=modal.App('lclm-stage3-pack-20260906')
+app=modal.App('lclm-stage3-pack-20260906-'+os.environ.get('LCLM_PACK_JOB','base'))
 image=(modal.Image.debian_slim(python_version='3.11')
     .pip_install('datasets==3.6.0','transformers==4.57.1','pyarrow>=18,<22','jinja2>=3.1')
     .env({'PYTHONPATH':'/opt/lclm','TOKENIZERS_PARALLELISM':'false'})
@@ -27,10 +28,12 @@ def pack_partition(partition:int,total:int=64,kind:str='base'):
     complete=output/'report.json'
     if complete.exists():return json.loads(complete.read_text())
     source=Path('/data/stage3-final-mixture-cot50-v1') if kind=='base' else ROOT/f'{kind}-transport'
+    if kind!='base' and not (source/'report.json').exists():
+        raise RuntimeError(f'Input export has not completed: {kind}')
     files=sorted(source.glob('*.parquet'))
     if not files:raise RuntimeError('Missing completed input data')
     selected=files[partition::total]
-    counts=Counter();source_counts=Counter()
+    counts=Counter(input_rows=0,eligible_rows=0,packed_rows=0,packed_batches=0);source_counts=Counter()
     # Restart only this partition's explicitly named staging folder. Completed
     # partitions are immutable and skipped above; raw sources are never edited.
     stage=output/'in-progress'
@@ -44,6 +47,7 @@ def pack_partition(partition:int,total:int=64,kind:str='base'):
             for batch in pq.ParquetFile(path).iter_batches(batch_size=32):
                 for row in batch.to_pylist():
                     counts['input_rows']+=1
+                    if kind=='base':row['_legacy_sft_prefix_strict']=True
                     yield row,16,'compression_prompt',32768,None
     def emit(batch):
         for row in batch:
@@ -75,6 +79,7 @@ def pack_partition(partition:int,total:int=64,kind:str='base'):
         'counts':dict(counts),'sub_datasets':dict(source_counts),'reference_chunk_size':16,
         'max_packed_length':32768,'decoder_tokenizer':'Qwen/Qwen3-4B-Instruct-2507',
         'encoder_tokenizer':'Qwen/Qwen3-Embedding-0.6B',
+        'base_prefix_recovery_separate':kind=='base',
         'format':'dynamic packed: decoder pretokenized; encoder memory strings tokenized at runtime'}
     complete.write_text(json.dumps(report,indent=2));volume.commit()
     return report

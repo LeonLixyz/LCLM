@@ -6,20 +6,38 @@ from collections import Counter
 from concurrent.futures import ThreadPoolExecutor,wait,FIRST_COMPLETED
 from pathlib import Path
 
-def generate_all(client,model,revision,root,commit,reload=None,concurrency=32):
+
+def parse_judge_json(content):
+    """Allow a JSON code fence, but never salvage malformed or non-boolean votes."""
+    import re
+    content=content.strip()
+    fenced=re.fullmatch(r'```(?:json)?\s*\n(.*?)\n```',content,re.S)
+    if fenced:content=fenced.group(1)
+    value=json.loads(content)
+    if not isinstance(value,dict) or any(type(value.get(k)) is not bool for k in ('correct','grounded')):
+        raise ValueError('Judge response requires boolean correct and grounded')
+    return value
+
+def generate_all(client,model,revision,root,commit,reload=None,concurrency=32,
+                 output_root=None,sources=None,pilot_limit=None):
     from data.synthetic_expansion_agent import TEACHER_SYSTEM_PROMPT,messages_for_openai_api,run_agent_rollout
     from data.real_expansion_agent import verify_real_trace
     root=Path(root)
+    output_root=Path(output_root) if output_root else root
+    output_root.mkdir(parents=True,exist_ok=True)
     root.mkdir(parents=True,exist_ok=True)
     manifest={'model':'Qwen/Qwen3-235B-A22B-Instruct-2507','served_model_name':model,'model_revision':revision,'teacher_system_prompt':TEACHER_SYSTEM_PROMPT,
         'teacher_prompt_saved_in_training_messages':False,'max_tool_calls':16,
         'max_tokens_per_turn':2048,'temperature':0,'concurrency':concurrency,
-        'segment_identity_headers':True}
-    path=root/'generation-manifest.json'
+        'segment_identity_headers':True,'task_normalization':'source-identity-maud-ontology-acord-beir-v2',
+        'judge_json_parser':'strict-optional-json-fence-v1',
+        'answer_normalization':'numeric-signs-decimals-percent-v2',
+        'pilot_limit':pilot_limit}
+    path=output_root/'generation-manifest.json'
     if path.exists() and json.loads(path.read_text())!=manifest:raise RuntimeError('Incompatible resume settings')
     path.write_text(json.dumps(manifest,indent=2));commit()
     total=Counter()
-    sources=['maud','finqa','pubmedqa_labeled','clapnq','contract_nli','tatqa','convfinqa',
+    sources=sources or ['maud','finqa','pubmedqa_labeled','clapnq','contract_nli','tatqa','convfinqa',
         'multihiertt','multidoc2dial','faithdial','watsonx_docs_qa','acord','billsum','lex_glue','synthetic']
     for source in sources:
         task_path=root/(source+'.tasks.jsonl')
@@ -29,7 +47,14 @@ def generate_all(client,model,revision,root,commit,reload=None,concurrency=32):
             time.sleep(20)
             if reload:reload()
         source=task_path.name.removesuffix('.tasks.jsonl')
-        accepted=root/(source+'.accepted.jsonl');rejected=root/(source+'.rejected.jsonl')
+        accepted=output_root/(source+'.accepted.jsonl');rejected=output_root/(source+'.rejected.jsonl')
+        from data.expansion_task_normalization import maud_field,prepare_teacher_task
+        maud_choices={}
+        if source=='maud':
+            with task_path.open() as stream:
+                for line in stream:
+                    task=json.loads(line)
+                    maud_choices.setdefault(maud_field(task),set()).add(task['gold_answer'])
         completed=set();counts=Counter()
         for p in (accepted,rejected):
             if p.exists():
@@ -37,15 +62,7 @@ def generate_all(client,model,revision,root,commit,reload=None,concurrency=32):
                     for line in f:
                         r=json.loads(line);completed.add(r['task_id']);counts[r['verification']['reason']]+=1
         def process(task):
-            if source!='synthetic':
-                from data.synthetic_expansion_agent import format_training_user_prompt
-                # The teacher sees document identities in routing summaries.
-                # Include the same identities in the underlying memory source,
-                # so they are not privileged information missing at training.
-                for segment in task['segments']:
-                    segment['text']='SOURCE '+segment['record_id']+'\n'+segment['text']
-                task['training_user_prompt']=format_training_user_prompt(task['segments'],task['question'])
-                task['user_prompt']=task['training_user_prompt']
+            task=prepare_teacher_task(task,maud_choices)
             def complete(messages,tools):
                 response=client.chat.completions.create(model=model,
                     messages=messages_for_openai_api(messages),tools=list(tools) if tools else None,
@@ -69,7 +86,7 @@ def generate_all(client,model,revision,root,commit,reload=None,concurrency=32):
                                 {'role':'user','content':json.dumps({'question':task['question'],'reference':task['gold_answer'],
                                     'answer':trace['messages'][-1].get('content',''),'evidence':evidence})}],
                             extra_body={'chat_template_kwargs':{'enable_thinking':False}})
-                        judgment=json.loads(judged.choices[0].message.content)
+                        judgment=parse_judge_json(judged.choices[0].message.content)
                         accepted=judgment.get('correct') is True and judgment.get('grounded') is True
                         trace['verification']={**verdict,'accepted':accepted,'answer_metric':'qwen_reference_and_evidence_judge',
                             'reason':'accepted:qwen_judge' if accepted else 'wrong_answer:qwen_judge','judge':judgment}
@@ -92,17 +109,32 @@ def generate_all(client,model,revision,root,commit,reload=None,concurrency=32):
                     counts[verdict['reason']]+=1;processed+=1
                 if processed%100<len(done):
                     out.flush();bad.flush();os.fsync(out.fileno());os.fsync(bad.fileno())
-                    (root/(source+'.progress.json')).write_text(json.dumps({'processed':processed,'reasons':dict(counts),'elapsed':time.time()-start}))
+                    (output_root/(source+'.progress.json')).write_text(json.dumps({'processed':processed,'reasons':dict(counts),'elapsed':time.time()-start}))
                     commit();print(source,processed,dict(counts),flush=True)
-            for line in tasks:
+                if not pilot_limit and processed>=100 and not any(k.startswith('accepted') for k in counts):
+                    out.flush();bad.flush();commit()
+                    raise RuntimeError(f'Zero acceptance circuit breaker: {source}')
+            if pilot_limit:
+                # Stable reservoir covers the whole source, not just its first
+                # answer class or source file.
+                import random
+                rng=random.Random(20260907);sample=[]
+                for i,line in enumerate(tasks):
+                    if i<pilot_limit:sample.append(line)
+                    else:
+                        j=rng.randrange(i+1)
+                        if j<pilot_limit:sample[j]=line
+                task_lines=sample
+            else:task_lines=tasks
+            for line in task_lines:
                 task=json.loads(line)
                 if task['task_id'] in completed:continue
                 pending.add(executor.submit(process,task))
                 if len(pending)>=concurrency*2:drain()
             while pending:drain()
         report={'status':'complete','source':source,'reasons':dict(counts)}
-        (root/(source+'.generation.json')).write_text(json.dumps(report,indent=2));commit()
+        (output_root/(source+'.generation.json')).write_text(json.dumps(report,indent=2));commit()
         total.update(counts)
     report={'status':'complete','reasons':dict(total),'manifest':manifest}
-    (root/'full-generation-report.json').write_text(json.dumps(report,indent=2));commit()
+    (output_root/('pilot-generation-report.json' if pilot_limit else 'full-generation-report.json')).write_text(json.dumps(report,indent=2));commit()
     return report

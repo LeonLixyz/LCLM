@@ -635,8 +635,28 @@ def process_sft_example(
 
     # 4. Compute labels: prompt = -100, target = trainable
     prompt_len = len(prompt_ids)
-    if full_ids[:prompt_len] != prompt_ids:
-        raise ValueError("Generation-ready prompt tokens are not a prefix of the full chat")
+    prefix_matches = full_ids[:prompt_len] == prompt_ids
+    if example.get('_recover_prefix_only') and prefix_matches:
+        return None
+    if not prefix_matches:
+        if example.get('_legacy_sft_prefix_strict'):
+            # The baseline/recovery release migration keeps these rows in its
+            # separate recovery shard group, including on baseline retries.
+            return None
+        if not getattr(tokenizer,'is_fast',False):
+            raise ValueError("Generation-ready prompt tokens are not a prefix of the full chat")
+        prompt_text=tokenizer.apply_chat_template(prompt_messages,tokenize=False,
+            add_generation_prompt=True,**template_kwargs)
+        full_text=tokenizer.apply_chat_template(full_messages,tokenize=False,
+            add_generation_prompt=False,**template_kwargs)
+        if not full_text.startswith(prompt_text):
+            raise ValueError('Generation-ready prompt text is not a prefix of the full chat')
+        encoded=tokenizer(full_text,add_special_tokens=False,return_offsets_mapping=True)
+        if list(encoded['input_ids'])!=full_ids:
+            raise ValueError('Full chat tokenization disagrees with offset tokenization')
+        boundary=len(prompt_text)
+        prompt_len=next((i for i,(start,end) in enumerate(encoded['offset_mapping'])
+                         if start>=boundary and end>start),len(full_ids))
     labels = [-100] * prompt_len + full_ids[prompt_len:]
 
     # 5. Find and mask memory regions (START, M, END)
