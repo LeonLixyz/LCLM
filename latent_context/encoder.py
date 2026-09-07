@@ -303,6 +303,7 @@ class Encoder(nn.Module):
 
         max_seq_len = input_ids.shape[1]
         chunks: List[torch.Tensor] = []
+        sync_dependencies: List[torch.Tensor] = []
         for b in range(sync_batches):
             s = b * self.max_encode_batch_size
             e = min(s + self.max_encode_batch_size, total)
@@ -314,14 +315,23 @@ class Encoder(nn.Module):
                     dtype=torch.long,
                     device=device,
                 )
-                self._forward_one(dummy, torch.zeros_like(dummy), torch.zeros_like(dummy))
+                dummy_hidden = self._forward_one(
+                    dummy, torch.ones_like(dummy), torch.zeros_like(dummy)
+                )
+                # The zero-valued dependency makes autograd traverse dummy
+                # forwards too. Without it, ranks can execute matching FSDP
+                # forwards but a different number of backwards/reductions.
+                sync_dependencies.append(dummy_hidden.sum() * 0.0)
             else:
                 chunks.append(
                     self._forward_one(
                         input_ids[s:e], attention_mask[s:e], position_ids[s:e]
                     )
                 )
-        return torch.cat(chunks, dim=0)
+        result = torch.cat(chunks, dim=0)
+        if sync_dependencies:
+            result = result + torch.stack(sync_dependencies).sum()
+        return result
 
     def _forward_one(
         self,

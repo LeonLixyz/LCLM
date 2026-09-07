@@ -49,6 +49,7 @@ from torch.distributed.fsdp.fully_sharded_data_parallel import ShardedStateDictC
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.distributed.fsdp import BackwardPrefetch                                                                                                   
 from utils.env import load_env
+from train.optimizer_utils import clear_optimizer_group_grads, global_has_memory
 
 torch.backends.cuda.enable_flash_sdp(True)
 torch.backends.cuda.enable_math_sdp(False)
@@ -158,6 +159,8 @@ class LCLMTrainer:
         # Set accelerator on the model components separately
         self.model.setup_accelerator(self.accelerator)
         self.model.encoder.setup_accelerator(self.accelerator)
+        self.model.accelerator = self.accelerator
+        self.model.encoder.accelerator = self.accelerator
 
         self.load_datasets()
         self.setup_optimizer_and_scheduler()
@@ -778,6 +781,11 @@ class LCLMTrainer:
         
         # Store parameter group names for logging
         self.param_group_names = [info[1] for info in group_info]
+        self._compression_param_group_indices = {
+            group_index
+            for group_index, group_name in group_info
+            if group_name in {"Embedder", "Adapter"}
+        }
         
         # Log what we're doing
         self.accelerator.print(f"Using {self.training_args.scheduler_type} scheduler for all parameter groups:")
@@ -810,6 +818,12 @@ class LCLMTrainer:
             self._stateful_dataloader = None
             self.model, self.optimizer, self.scheduler, self.train_dataloader = self.accelerator.prepare(
                 self.model, self.optimizer, self.scheduler, self.train_dataloader)
+
+        # Accelerate may replace the root model with a DDP/FSDP/DeepSpeed
+        # wrapper. Rebind the custom cross-rank helpers on the unwrapped module.
+        unwrapped_model = self.accelerator.unwrap_model(self.model)
+        unwrapped_model.setup_accelerator(self.accelerator)
+        unwrapped_model.encoder.setup_accelerator(self.accelerator)
 
         # Load checkpoint if auto-resume is enabled
         if self.auto_resume_checkpoint_path is not None:
@@ -1383,6 +1397,23 @@ class LCLMTrainer:
         outputs = self.model(**batch, sample_lens=sample_lens)
         loss = outputs.loss
 
+        # Track whether any microbatch contributing to this optimizer step used
+        # compression. Dummy module participation is still required for
+        # distributed collectives, but globally all-uncompressed steps should
+        # not advance AdamW momentum/weight decay for encoder/adapter groups.
+        if not hasattr(self, "_optimizer_step_has_memory"):
+            self._optimizer_step_has_memory = False
+        self._optimizer_step_has_memory = (
+            self._optimizer_step_has_memory
+            or bool(
+                getattr(
+                    self.accelerator.unwrap_model(self.model),
+                    "_last_local_has_memory",
+                    False,
+                )
+            )
+        )
+
         # DEBUG: Sync and check after forward
         # import torch
         # torch.cuda.synchronize()
@@ -1415,7 +1446,10 @@ class LCLMTrainer:
             skip_nan_grad_step = True
             self.accelerator.print(f"[Step {self.global_step}] Non-finite detected. Skipping optimizer step.")
             self.optimizer.zero_grad(set_to_none=True)
+            self._optimizer_step_has_memory = False
         else:
+            if self.accelerator.sync_gradients and not self._global_optimizer_step_has_memory():
+                self._clear_compression_group_grads()
             
             if self.accelerator.sync_gradients:
                 self.accelerator.clip_grad_norm_(self.model.parameters(), self.training_args.max_grad_norm)
@@ -1426,6 +1460,7 @@ class LCLMTrainer:
             # Step scheduler only at end of gradient accumulation
             if self.accelerator.sync_gradients:
                 self.scheduler.step()
+                self._optimizer_step_has_memory = False
 
             # Zero gradients
             self.optimizer.zero_grad()
@@ -1437,6 +1472,21 @@ class LCLMTrainer:
             return loss.item()
             
         return None
+
+    def _global_optimizer_step_has_memory(self) -> bool:
+        """Return whether any rank/microbatch used a real memory region."""
+        return global_has_memory(
+            bool(getattr(self, "_optimizer_step_has_memory", False)),
+            device=self.accelerator.device,
+            distributed=self.accelerator.num_processes > 1,
+        )
+
+    def _clear_compression_group_grads(self) -> None:
+        """Make a globally uncompressed step a true optimizer no-op for LCLM."""
+        clear_optimizer_group_grads(
+            self.optimizer,
+            getattr(self, "_compression_param_group_indices", set()),
+        )
         
     
             

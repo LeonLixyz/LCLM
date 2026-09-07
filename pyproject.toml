@@ -1,10 +1,10 @@
 [project]
-name = "code-llava"
+name = "lclm"
 version = "0.1.0"
-description = "Training pipeline for Code LLaVA"
+description = "Training and inference for Latent Context Language Models"
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
-authors = [{ name = "Code LLaVA Contributors" }]
+authors = [{ name = "LCLM Contributors" }]
 dependencies = [
     "torch",
     "transformers",
@@ -46,8 +46,8 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = [
-  "inference", "latent_context", "train", "utils"
+  "data", "inference", "latent_context", "train", "utils"
 ]
 
 [tool.uv]
-no-build-isolation-package = ["flash-attn"] 
+no-build-isolation-package = ["flash-attn"]

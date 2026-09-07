@@ -87,6 +87,18 @@ def _install_worker_tokenizer(monkeypatch):
     return tokenizer
 
 
+def test_native_json_transport_matches_object_input(monkeypatch):
+    _install_worker_tokenizer(monkeypatch)
+    row={'messages':[{'role':'user','content':'do it'},
+        {'role':'assistant','content':'','tool_calls':[{'type':'function','function':{'name':'run','arguments':{'x':1}}}]}],
+        'tools':[{'type':'function','function':{'name':'run','parameters':{'type':'object'}}}]}
+    ordinary=preprocessing.worker_process_example((row,16,'compression_prompt',None,None))
+    transport={k:json.dumps(v) for k,v in row.items()}
+    decoded=preprocessing.worker_process_example((transport,16,'compression_prompt',None,None))
+    assert ordinary is not None
+    assert decoded==ordinary
+
+
 def test_sft_target_cot_is_compacted_and_masked():
     tokenizer = FakeQwenTokenizer()
     target = "<|memory_start|>hidden reasoning<|memory_end|>FINAL"

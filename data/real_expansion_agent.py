@@ -272,6 +272,8 @@ def verify_real_trace(
 
     structural = verify_trace(task, messages)
     result = structural.as_dict()
+    if structural.reason not in {"accepted", "wrong_final_answer"}:
+        return result
     if not structural.expanded_support:
         result.update(accepted=False, reason="no_tool_call")
         return result

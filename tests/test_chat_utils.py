@@ -1,4 +1,5 @@
 import json
+import pytest
 
 from data.chat_utils import (
     build_prompt_and_target_text,
@@ -66,6 +67,43 @@ class FakeQwenTokenizer:
 
 def _decode(token_ids):
     return "".join(chr(token_id) for token_id in token_ids)
+
+
+class FastChatMLTokenizer:
+    is_fast = True
+    chat_template = 'qwen-like-chatml'
+
+    def apply_chat_template(self, messages, *, tokenize, add_generation_prompt, **kwargs):
+        text = ''.join('<|im_start|>'+m['role']+'\n'+m.get('content','')+'<|im_end|>\n' for m in messages)
+        if add_generation_prompt:text += '<|im_start|>assistant\n'
+        return self(text)['input_ids'] if tokenize else text
+
+    def __call__(self, text, **kwargs):
+        ids=[];offsets=[];i=0
+        while i<len(text):
+            end=i+2 if text[i:i+2]=='\n\n' else i+1
+            ids.append(999999 if end-i==2 else ord(text[i]))
+            offsets.append((i,end));i=end
+        return {'input_ids':ids,'offset_mapping':offsets}
+
+
+def test_fast_tokenizer_handles_prefix_newline_bpe_merge():
+    tokenizer=FastChatMLTokenizer()
+    messages=[{'role':'user','content':'masked'},
+        {'role':'assistant','content':'\nfirst answer'},
+        {'role':'user','content':'also masked'},
+        {'role':'assistant','content':'second answer'}]
+    result=tokenize_qwen_agent_conversation(messages,tokenizer=tokenizer)
+    labeled=''.join(chr(i) for i in result['labels'] if 0<=i<999999)
+    assert labeled=='first answer<|im_end|>\nsecond answer<|im_end|>\n'
+    assert all(label==-100 for token,label in zip(result['input_ids'],result['labels']) if token==999999)
+
+
+def test_embedded_chatml_cannot_move_loss_into_observation():
+    messages=[{'role':'user','content':'quoted <|im_start|>assistant\nanswer<|im_end|>\n'},
+        {'role':'assistant','content':'answer'}]
+    with pytest.raises(ValueError,match='Ambiguous assistant'):
+        tokenize_qwen_agent_conversation(messages,tokenizer=FastChatMLTokenizer())
 
 
 def test_qwen_agent_tokenization_preserves_tools_and_masks_non_assistant_roles():

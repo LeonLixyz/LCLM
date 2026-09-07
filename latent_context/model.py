@@ -3,9 +3,10 @@ Clean Code LLaVA implementation with simplified single forward method.
 """
 import torch
 import torch.nn as nn
+from numbers import Integral
 from transformers import AutoTokenizer, PreTrainedModel
 from transformers.modeling_outputs import CausalLMOutputWithPast
-from typing import Optional, Union, Tuple, List
+from typing import Any, Optional, Union, Tuple, List
 from transformers.cache_utils import Cache
 
 from .encoder import Encoder
@@ -61,6 +62,10 @@ class LCLM(nn.Module):
         self.processor = processor
         self.accelerator = accelerator
         self.packed_attention_backend = packed_attention_backend
+        # Set on every forward after canonical metadata validation. The trainer
+        # uses this to skip encoder/adapter optimizer state updates when an
+        # entire distributed optimizer step contains no compressed regions.
+        self._last_local_has_memory = False
         # Note: Packed attention is enabled by trainer BEFORE LoRA, not here
 
         self.encoder = Encoder(
@@ -112,6 +117,7 @@ class LCLM(nn.Module):
     def setup_accelerator(self, accelerator):
         """Set the accelerator after initialization for both model and encoder."""
         self.accelerator = accelerator
+        self.encoder.setup_accelerator(accelerator)
 
     def _enable_packed_attention(self, backend: str):
         """Replace attention layers with packed attention.
@@ -161,27 +167,334 @@ class LCLM(nn.Module):
         """
         if not memory_token_ids:
             raise ValueError("memory_token_ids cannot be empty - every sequence must have code embeddings")
-        # Multi-segment per-sample (List[List[List[int]]])
-        if isinstance(memory_token_ids[0], list) and len(memory_token_ids[0]) > 0 and isinstance(memory_token_ids[0][0], list):
-            # Process each batch item SEPARATELY to avoid cross-batch interference
-            # This ensures B=1 and B=2 produce identical embeddings for the same code
-            regrouped: List[List[torch.Tensor]] = []
-
-            for batch_idx, segs in enumerate(memory_token_ids):  # type: ignore[index]
-                if not segs:
-                    regrouped.append([])
-                    continue
-
-                # Process this batch item's segments
-                batch_embeds = self.encoder(segs)
-                batch_projected = self._project_latent_embeddings_synced(batch_embeds)
-                regrouped.append(batch_projected)
-
+        # Multi-segment per-sample (List[List[List[int]]]). Inspect the complete
+        # outer list so a leading uncompressed sample cannot hide later segments.
+        if all(self._is_segment_list(item) for item in memory_token_ids):
+            normalized = self._normalize_batched_memory_token_ids(
+                memory_token_ids, len(memory_token_ids)
+            )
+            regrouped, _ = self._process_batched_latent_embeddings(
+                normalized,
+                ensure_participation=(
+                    self._distributed_encoder_participation_required()
+                    or (self.training and torch.is_grad_enabled())
+                ),
+            )
             return regrouped
         # Single-segment per-sample (List[List[int]])
+        if not all(self._is_token_sequence(item) for item in memory_token_ids):
+            raise ValueError(
+                "memory_token_ids must have shape [segment][token] or "
+                "[batch][segment][token]"
+            )
         chunk_embeddings_list = self.encoder(memory_token_ids)  # type: ignore[arg-type]
         projected_embeddings_list = self._project_latent_embeddings_synced(chunk_embeddings_list)
         return projected_embeddings_list
+
+    @staticmethod
+    def _is_token_sequence(value: Any) -> bool:
+        """Return whether ``value`` is one (possibly empty) 1-D token sequence."""
+        if isinstance(value, torch.Tensor):
+            return value.dim() == 1
+        if not isinstance(value, (list, tuple)):
+            return False
+        return all(
+            not isinstance(token, (list, tuple, torch.Tensor))
+            for token in value
+        )
+
+    @classmethod
+    def _is_segment_list(cls, value: Any) -> bool:
+        """Return whether ``value`` is a per-sample list of token sequences."""
+        return isinstance(value, (list, tuple)) and all(
+            cls._is_token_sequence(segment) for segment in value
+        )
+
+    @staticmethod
+    def _token_sequence_to_list(value: Any, *, location: str) -> List[int]:
+        if isinstance(value, torch.Tensor):
+            if value.dim() != 1:
+                raise ValueError(
+                    f"{location} must be a 1-D token sequence, got tensor shape "
+                    f"{tuple(value.shape)}"
+                )
+            value = value.detach().cpu().tolist()
+        elif isinstance(value, tuple):
+            value = list(value)
+
+        if not isinstance(value, list):
+            raise ValueError(f"{location} must be a token sequence, got {type(value).__name__}")
+
+        result: List[int] = []
+        for token_idx, token in enumerate(value):
+            if isinstance(token, bool) or not isinstance(token, Integral):
+                raise ValueError(
+                    f"{location}[{token_idx}] must be an integer token ID, got {token!r}"
+                )
+            result.append(int(token))
+        return result
+
+    @classmethod
+    def _normalize_batched_memory_token_ids(
+        cls,
+        memory_token_ids: Any,
+        batch_size: int,
+    ) -> List[List[List[int]]]:
+        """Normalize memory IDs to ``[batch][segment][token]``.
+
+        Packed data already uses the canonical three-level representation, but
+        older single-example callers pass ``[segment][token]``.  A batch whose
+        first sample is uncompressed (``[[], [[...]]]``) must not be classified
+        by inspecting only that first empty sample.
+        """
+        if batch_size <= 0:
+            raise ValueError(f"batch_size must be positive, got {batch_size}")
+        if memory_token_ids is None:
+            return [[] for _ in range(batch_size)]
+        if isinstance(memory_token_ids, torch.Tensor):
+            memory_token_ids = memory_token_ids.detach().cpu().tolist()
+        if not isinstance(memory_token_ids, (list, tuple)):
+            raise ValueError(
+                "memory_token_ids must be a list in [batch][segment][token] "
+                f"or legacy [segment][token] form, got {type(memory_token_ids).__name__}"
+            )
+
+        raw = list(memory_token_ids)
+        if not raw:
+            return [[] for _ in range(batch_size)]
+
+        # Canonical [batch][segment][token]. Empty per-sample segment lists are
+        # intentionally valid and represent examples that bypass compression.
+        if len(raw) == batch_size and all(cls._is_segment_list(item) for item in raw):
+            batched = [list(item) for item in raw]
+        # Legacy single-example [segment][token].
+        elif batch_size == 1 and all(cls._is_token_sequence(item) for item in raw):
+            batched = [raw]
+        # Compatibility form for a multi-example batch with one segment per
+        # sample: [batch][token]. An empty token list means no segment.
+        elif len(raw) == batch_size and all(cls._is_token_sequence(item) for item in raw):
+            batched = [[item] if len(item) > 0 else [] for item in raw]
+        else:
+            raise ValueError(
+                "memory_token_ids has an ambiguous or invalid shape for batch "
+                f"size {batch_size}; expected [batch][segment][token]"
+            )
+
+        normalized: List[List[List[int]]] = []
+        for batch_idx, segments in enumerate(batched):
+            normalized_segments: List[List[int]] = []
+            for segment_idx, segment in enumerate(segments):
+                token_ids = cls._token_sequence_to_list(
+                    segment,
+                    location=f"memory_token_ids[{batch_idx}][{segment_idx}]",
+                )
+                if not token_ids:
+                    raise ValueError(
+                        f"memory_token_ids[{batch_idx}][{segment_idx}] is empty; "
+                        "use an empty per-sample segment list to disable compression"
+                    )
+                normalized_segments.append(token_ids)
+            normalized.append(normalized_segments)
+        return normalized
+
+    @staticmethod
+    def _is_position(value: Any) -> bool:
+        return (
+            isinstance(value, (list, tuple))
+            and len(value) == 2
+            and all(
+                isinstance(endpoint, Integral) and not isinstance(endpoint, bool)
+                for endpoint in value
+            )
+        )
+
+    @classmethod
+    def _normalize_batched_memory_positions(
+        cls,
+        memory_positions: Any,
+        batch_size: int,
+    ) -> List[List[Tuple[int, int]]]:
+        """Normalize positions to ``[batch][segment](start, end)``."""
+        if memory_positions is None:
+            return [[] for _ in range(batch_size)]
+        if not isinstance(memory_positions, (list, tuple)):
+            raise ValueError(
+                f"memory_positions must be a list, got {type(memory_positions).__name__}"
+            )
+        raw = list(memory_positions)
+        if not raw:
+            return [[] for _ in range(batch_size)]
+
+        is_position_list = lambda value: isinstance(value, (list, tuple)) and all(  # noqa: E731
+            cls._is_position(position) for position in value
+        )
+        if len(raw) == batch_size and all(is_position_list(item) for item in raw):
+            batched = [list(item) for item in raw]
+        elif batch_size == 1 and all(cls._is_position(item) for item in raw):
+            batched = [raw]
+        elif len(raw) == batch_size and all(cls._is_position(item) for item in raw):
+            batched = [[item] for item in raw]
+        else:
+            raise ValueError(
+                "memory_positions has an ambiguous or invalid shape for batch "
+                f"size {batch_size}; expected [batch][segment](start, end)"
+            )
+
+        return [
+            [(int(start), int(end)) for start, end in positions]
+            for positions in batched
+        ]
+
+    @staticmethod
+    def _is_count(value: Any) -> bool:
+        return isinstance(value, Integral) and not isinstance(value, bool)
+
+    @classmethod
+    def _normalize_batched_latent_counts(
+        cls,
+        latent_counts: Any,
+        batch_size: int,
+    ) -> List[List[int]]:
+        """Normalize latent counts to ``[batch][segment]``."""
+        if latent_counts is None:
+            return [[] for _ in range(batch_size)]
+        if not isinstance(latent_counts, (list, tuple)):
+            raise ValueError(
+                f"latent_counts must be a list, got {type(latent_counts).__name__}"
+            )
+        raw = list(latent_counts)
+        if not raw:
+            return [[] for _ in range(batch_size)]
+
+        is_count_list = lambda value: isinstance(value, (list, tuple)) and all(  # noqa: E731
+            cls._is_count(count) for count in value
+        )
+        if len(raw) == batch_size and all(is_count_list(item) for item in raw):
+            batched = [list(item) for item in raw]
+        elif batch_size == 1 and all(cls._is_count(item) for item in raw):
+            batched = [raw]
+        elif len(raw) == batch_size and all(cls._is_count(item) for item in raw):
+            batched = [[item] for item in raw]
+        else:
+            raise ValueError(
+                "latent_counts has an ambiguous or invalid shape for batch "
+                f"size {batch_size}; expected [batch][segment]"
+            )
+
+        return [[int(count) for count in counts] for counts in batched]
+
+    @classmethod
+    def _normalize_and_validate_memory_batch(
+        cls,
+        memory_token_ids: Any,
+        memory_positions: Any,
+        latent_counts: Any,
+        batch_size: int,
+        sequence_length: Optional[int] = None,
+    ) -> Tuple[
+        List[List[List[int]]],
+        List[List[Tuple[int, int]]],
+        List[List[int]],
+    ]:
+        codes = cls._normalize_batched_memory_token_ids(memory_token_ids, batch_size)
+        positions = cls._normalize_batched_memory_positions(memory_positions, batch_size)
+        counts = cls._normalize_batched_latent_counts(latent_counts, batch_size)
+
+        for batch_idx, (sample_codes, sample_positions, sample_counts) in enumerate(
+            zip(codes, positions, counts)
+        ):
+            if not (
+                len(sample_codes) == len(sample_positions) == len(sample_counts)
+            ):
+                raise ValueError(
+                    f"Batch {batch_idx} has inconsistent memory metadata: "
+                    f"{len(sample_codes)} token segments, "
+                    f"{len(sample_positions)} positions, and "
+                    f"{len(sample_counts)} latent counts"
+                )
+            for segment_idx, ((start, end), count) in enumerate(
+                zip(sample_positions, sample_counts)
+            ):
+                if count <= 0:
+                    raise ValueError(
+                        f"latent_counts[{batch_idx}][{segment_idx}] must be positive, got {count}"
+                    )
+                if start < 0 or end <= start:
+                    raise ValueError(
+                        f"memory_positions[{batch_idx}][{segment_idx}] is invalid: "
+                        f"({start}, {end})"
+                    )
+                if end - start != count:
+                    raise ValueError(
+                        f"Batch {batch_idx}, segment {segment_idx}: position width "
+                        f"{end - start} does not match latent count {count}"
+                    )
+                if sequence_length is not None and end > sequence_length:
+                    raise ValueError(
+                        f"memory_positions[{batch_idx}][{segment_idx}] ends at {end}, "
+                        f"past sequence length {sequence_length}"
+                    )
+        return codes, positions, counts
+
+    def _distributed_encoder_participation_required(self) -> bool:
+        return (
+            self.accelerator is not None
+            and getattr(self.accelerator, "num_processes", 1) > 1
+        )
+
+    def _process_batched_latent_embeddings(
+        self,
+        memory_token_ids: List[List[List[int]]],
+        *,
+        ensure_participation: bool,
+    ) -> Tuple[List[List[torch.Tensor]], Optional[torch.Tensor]]:
+        """Encode all real segments in one synchronized encoder/adapter call.
+
+        When a rank has no compressed segments during training, one synthetic
+        segment is forwarded through both modules. Its scalar zero contribution
+        is returned so the caller can connect that work to the decoder loss,
+        giving encoder/adapter parameters zero (rather than missing) gradients.
+        """
+        regrouped: List[List[torch.Tensor]] = [
+            [] for _ in range(len(memory_token_ids))
+        ]
+        flat_segments: List[List[int]] = []
+        owners: List[Tuple[int, int]] = []
+        for batch_idx, segments in enumerate(memory_token_ids):
+            for segment_idx, segment in enumerate(segments):
+                flat_segments.append(segment)
+                owners.append((batch_idx, segment_idx))
+
+        used_dummy = not flat_segments
+        if used_dummy and not ensure_participation:
+            return regrouped, None
+
+        encoder_inputs = flat_segments
+        if used_dummy:
+            dummy_token_id = getattr(self.encoder, "pad_token_id", None)
+            if dummy_token_id is None:
+                tokenizer = getattr(self.encoder, "embed_tokenizer", None)
+                dummy_token_id = getattr(tokenizer, "eos_token_id", None)
+            if dummy_token_id is None:
+                dummy_token_id = 0
+            encoder_inputs = [[int(dummy_token_id)]]
+
+        encoded = self.encoder(encoder_inputs)
+        projected = self._project_latent_embeddings_synced(encoded)
+        if len(projected) != len(encoder_inputs):
+            raise RuntimeError(
+                "Encoder/adapter output count mismatch: "
+                f"expected {len(encoder_inputs)}, got {len(projected)}"
+            )
+
+        if used_dummy:
+            zero_dependency = projected[0].sum() * 0.0
+            return regrouped, zero_dependency
+
+        for owner, embedding in zip(owners, projected):
+            batch_idx, _ = owner
+            regrouped[batch_idx].append(embedding)
+        return regrouped, None
 
     # if we wrap the adapter with FSDP, we need to the operations across all ranks as well. Here we just concat all embeddings and do 1 forward pass as the memory would be cheap.
     def _project_latent_embeddings_synced(
@@ -293,32 +606,17 @@ class LCLM(nn.Module):
             attention_mask = attention_mask.to(device)
         if labels is not None:
             labels = labels.to(device)
-        # Normalize to nested structures
-        if isinstance(memory_token_ids, list) and len(memory_token_ids) > 0 and isinstance(memory_token_ids[0], list):
-            # Check if it's List[List[int]] (single sample) or List[List[List[int]]] (batch)
-            if len(memory_token_ids[0]) > 0 and isinstance(memory_token_ids[0][0], list):
-                codes_nested: List[List[List[int]]] = memory_token_ids  # type: ignore[assignment]
-            else:
-                # Single sample: List[List[int]] -> wrap in batch dimension
-                codes_nested = [memory_token_ids]  # type: ignore[list-item]
-        elif isinstance(memory_token_ids, list):
-            codes_nested = [[c] for c in memory_token_ids]  # type: ignore[list-item]
-        else:
-            codes_nested = [[] for _ in range(input_ids.size(0))]
-
-        if isinstance(memory_positions, list) and len(memory_positions) > 0 and isinstance(memory_positions[0], list):
-            pos_nested: List[List[Tuple[int, int]]] = memory_positions  # type: ignore[assignment]
-        elif isinstance(memory_positions, list):
-            pos_nested = [memory_positions]
-        else:
-            pos_nested = [[] for _ in range(input_ids.size(0))]
-
-        if isinstance(latent_counts, list) and len(latent_counts) > 0 and isinstance(latent_counts[0], list):
-            counts_nested: List[List[int]] = latent_counts  # type: ignore[assignment]
-        elif isinstance(latent_counts, list):
-            counts_nested = [latent_counts]
-        else:
-            counts_nested = [[] for _ in range(input_ids.size(0))]
+        batch_size, sequence_length = input_ids.shape[:2]
+        codes_nested, pos_nested, counts_nested = (
+            self._normalize_and_validate_memory_batch(
+                memory_token_ids,
+                memory_positions,
+                latent_counts,
+                batch_size=batch_size,
+                sequence_length=sequence_length,
+            )
+        )
+        self._last_local_has_memory = any(codes_nested)
 
         # Create new tensor and copy embeddings (avoids in-place modification issues with FSDP)
         # Cast to compute dtype to avoid LayerNorm dtype mismatch with FSDP mixed precision
@@ -328,8 +626,19 @@ class LCLM(nn.Module):
         inputs_embeds = text_embeds.new_zeros(text_embeds.shape)
         inputs_embeds.copy_(text_embeds)
 
-        # Process code through chunker and adapter
-        latent_embeddings_nested = self._process_latent_embeddings(codes_nested)
+        # Every training rank must enter encoder/adapter exactly once. This is
+        # required by FSDP/DDP when a local packed batch happens to contain only
+        # examples that intentionally bypass compression.
+        ensure_participation = (
+            self._distributed_encoder_participation_required()
+            or (self.training and torch.is_grad_enabled())
+        )
+        latent_embeddings_nested, zero_dependency = (
+            self._process_batched_latent_embeddings(
+                codes_nested,
+                ensure_participation=ensure_participation,
+            )
+        )
 
         # Store memory_token_ids and encoder reference for debugging in processor
         self.processor._debug_memory_token_ids_nested = codes_nested
@@ -343,6 +652,14 @@ class LCLM(nn.Module):
             latent_counts=counts_nested,
             input_ids=input_ids,
         )
+
+        if zero_dependency is not None:
+            # Keep the dummy encoder/adapter graph in backward without changing
+            # any decoder embedding or loss value.
+            combined_embeds = combined_embeds + zero_dependency.to(
+                device=combined_embeds.device,
+                dtype=combined_embeds.dtype,
+            )
 
         # Clear debug references
         self.processor._debug_memory_token_ids_nested = None
@@ -484,28 +801,16 @@ class LCLM(nn.Module):
 
         input_ids = input_ids.to(device)
         attention_mask = attention_mask.to(device)
-        # Normalize to nested
-        if isinstance(memory_token_ids, list) and len(memory_token_ids) > 0 and isinstance(memory_token_ids[0], list):
-            if len(memory_token_ids[0]) > 0 and isinstance(memory_token_ids[0][0], list):
-                codes_nested: List[List[List[int]]] = memory_token_ids  # type: ignore[assignment]
-            else:
-                codes_nested = [memory_token_ids]  # type: ignore[assignment]
-        else:
-            codes_nested = [[] for _ in range(input_ids.size(0))]
-
-        if isinstance(memory_positions, list) and len(memory_positions) > 0 and isinstance(memory_positions[0], list):
-            pos_nested: List[List[Tuple[int, int]]] = memory_positions  # type: ignore[assignment]
-        elif isinstance(memory_positions, list):
-            pos_nested = [memory_positions]
-        else:
-            pos_nested = [[] for _ in range(input_ids.size(0))]
-
-        if isinstance(latent_counts, list) and len(latent_counts) > 0 and isinstance(latent_counts[0], list):
-            counts_nested: List[List[int]] = latent_counts  # type: ignore[assignment]
-        elif isinstance(latent_counts, list):
-            counts_nested = [latent_counts]
-        else:
-            counts_nested = [[] for _ in range(input_ids.size(0))]
+        batch_size, sequence_length = input_ids.shape[:2]
+        codes_nested, pos_nested, counts_nested = (
+            self._normalize_and_validate_memory_batch(
+                memory_token_ids,
+                memory_positions,
+                latent_counts,
+                batch_size=batch_size,
+                sequence_length=sequence_length,
+            )
+        )
 
         # Create new tensor and copy embeddings (avoids in-place modification issues)
         # Cast to compute dtype to avoid LayerNorm dtype mismatch
@@ -513,7 +818,12 @@ class LCLM(nn.Module):
         text_embeds = self.decoder.get_input_embeddings()(input_ids).to(compute_dtype)
         inputs_embeds = text_embeds.new_zeros(text_embeds.shape)
         inputs_embeds.copy_(text_embeds)
-        latent_embeddings_nested = self._process_latent_embeddings(codes_nested)
+        latent_embeddings_nested, zero_dependency = (
+            self._process_batched_latent_embeddings(
+                codes_nested,
+                ensure_participation=self._distributed_encoder_participation_required(),
+            )
+        )
 
         combined_embeds = self.processor.replace_memory_tokens_with_embeddings(
             inputs_embeds=inputs_embeds,
@@ -522,6 +832,11 @@ class LCLM(nn.Module):
             latent_counts=counts_nested,
             input_ids=input_ids,
         )
+        if zero_dependency is not None:
+            combined_embeds = combined_embeds + zero_dependency.to(
+                device=combined_embeds.device,
+                dtype=combined_embeds.dtype,
+            )
         
         # Generate using the LLM
         return self.decoder.generate(

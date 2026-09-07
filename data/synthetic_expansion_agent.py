@@ -652,18 +652,18 @@ def run_agent_rollout(
     while True:
         try:
             assistant = canonicalize_assistant_response(
-                complete(rollout_messages, [EXPAND_TOOL])
+                complete(rollout_messages, [EXPAND_TOOL] if tool_call_count < max_tool_calls else [])
             )
         except (TypeError, ValueError) as exc:
             failure_reason = f"invalid_assistant_response:{exc}"
             break
-        messages.append(copy.deepcopy(assistant))
-        rollout_messages.append(copy.deepcopy(assistant))
         calls = assistant.get("tool_calls") or []
-        if not calls:
-            break
         if tool_call_count + len(calls) > max_tool_calls:
             failure_reason = "tool_call_limit"
+            break
+        messages.append(copy.deepcopy(assistant))
+        rollout_messages.append(copy.deepcopy(assistant))
+        if not calls:
             break
         for call in calls:
             segment_id = call["function"]["arguments"]["segment_id"]
@@ -711,4 +711,5 @@ def run_agent_rollout(
         "segment_count": len(task["segments"]),
         "tool_call_count": tool_call_count,
         "verification": verification.as_dict(),
+        "rollout_failure_reason": failure_reason,
     }

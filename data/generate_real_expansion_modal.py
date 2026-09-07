@@ -157,6 +157,15 @@ class RealExpansionGenerator:
                 process.kill()
 
     @modal.method()
+    def generate_full(self) -> dict[str, Any]:
+        from openai import OpenAI
+        from data.full_expansion_rollouts import generate_all
+        data_volume.reload()
+        client=OpenAI(api_key='not-needed',base_url=f'http://127.0.0.1:{MODEL_PORT}/v1',timeout=300,max_retries=2)
+        return generate_all(client,SERVED_MODEL_NAME,MODEL_REVISION,
+            DATA_ROOT/'full-20260906-v3',data_volume.commit,data_volume.reload)
+
+    @modal.method()
     def generate(
         self,
         *,
@@ -226,8 +235,8 @@ class RealExpansionGenerator:
                 response = client.chat.completions.create(
                     model=SERVED_MODEL_NAME,
                     messages=messages_for_openai_api(messages),
-                    tools=list(tools),
-                    tool_choice="auto",
+                    tools=list(tools) if tools else None,
+                    tool_choice="auto" if tools else None,
                     parallel_tool_calls=True,
                     temperature=temperature,
                     top_p=0.95,
@@ -243,7 +252,8 @@ class RealExpansionGenerator:
 
             try:
                 trace = run_agent_rollout(task, complete, max_tool_calls=max_tool_calls)
-                trace["verification"] = verify_real_trace(task, trace["messages"])
+                if not trace.get("rollout_failure_reason"):
+                    trace["verification"] = verify_real_trace(task, trace["messages"])
                 trace.update(
                     data_type="real_expansion_agent",
                     source_dataset=task["source_dataset"],
@@ -325,7 +335,11 @@ def main(
     seed: int = 20260825,
     max_tool_calls: int = 4,
     temperature: float = 0.0,
+    full: bool = False,
 ) -> None:
+    if full:
+        print(json.dumps(RealExpansionGenerator().generate_full.remote(),indent=2))
+        return
     call = RealExpansionGenerator().generate.spawn(
         run_name=run_name,
         seed=seed,

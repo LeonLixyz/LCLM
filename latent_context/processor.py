@@ -34,6 +34,9 @@ class LCLMProcessor:
         self.compression_ratio = compression_ratio
         self.max_memory_length = max_memory_length
         self.use_memory_wrapping = use_memory_wrapping
+
+        if self.compression_ratio <= 0:
+            raise ValueError(f"compression_ratio must be positive, got {self.compression_ratio}")
         
         # Special tokens
         self.memory_placeholder = "<|memory|>"
@@ -75,12 +78,18 @@ class LCLMProcessor:
             # Extract the code content
             memory_content = match.group(1)
 
+            if not memory_content.strip():
+                raise ValueError("Memory regions must contain non-whitespace text")
+
             # Tokenize with embed tokenizer and store token IDs (not raw string)
             token_ids = self.embed_tokenizer.encode(memory_content, add_special_tokens=False)
             memory_token_ids.append(token_ids)
 
             embed_len = len(token_ids)
-            num_chunks = math.ceil(embed_len / self.compression_ratio)
+            # A syntactically valid memory region must always produce at least one
+            # decoder placeholder, even for tokenizers that emit no IDs for a
+            # particular string.
+            num_chunks = max(1, math.ceil(embed_len / self.compression_ratio))
 
             latent_counts.append(num_chunks)
             embed_token_counts.append(embed_len)
@@ -115,22 +124,40 @@ class LCLMProcessor:
 
         batch_size = len(prompts)
         expanded_prompts = []
+        expanded_targets = [] if targets is not None else None
         all_memory_token_ids = []
         all_latent_counts = []
         all_embed_token_counts = []
 
-        # Process each prompt using regex
-        for prompt in prompts:
+        # Process prompt and target independently, then concatenate their memory
+        # metadata in serialized sequence order.  Target-side regions are used for
+        # CoT compression: the compressed span itself is masked below while any
+        # unwrapped final-answer suffix remains supervised.
+        for batch_idx, prompt in enumerate(prompts):
             modified_prompt, memory_token_ids, latent_counts, embed_counts = self.extract_and_replace_memory_regions(prompt)
             expanded_prompts.append(modified_prompt)
+
+            if targets is not None:
+                modified_target, target_memory_ids, target_latent_counts, target_embed_counts = (
+                    self.extract_and_replace_memory_regions(targets[batch_idx])
+                )
+                expanded_targets.append(modified_target)
+                memory_token_ids.extend(target_memory_ids)
+                latent_counts.extend(target_latent_counts)
+                embed_counts.extend(target_embed_counts)
+
             all_memory_token_ids.append(memory_token_ids)
             all_latent_counts.append(latent_counts)
             all_embed_token_counts.append(embed_counts)
 
         # Compose full sequences with optional targets
         if targets is not None:
-            full_sequences = [p + t for p, t in zip(expanded_prompts, targets)]
-            prompt_lengths = [len(self.decoder_tokenizer.encode(p, add_special_tokens=False)) for p in expanded_prompts]
+            full_sequences = [p + t for p, t in zip(expanded_prompts, expanded_targets)]
+            prompt_token_ids = [
+                self.decoder_tokenizer.encode(p, add_special_tokens=False)
+                for p in expanded_prompts
+            ]
+            prompt_lengths = [len(token_ids) for token_ids in prompt_token_ids]
         else:
             full_sequences = expanded_prompts
             prompt_lengths = None
@@ -140,6 +167,8 @@ class LCLMProcessor:
             full_sequences,
             padding=padding,
             truncation=truncation,
+            max_length=max_length,
+            add_special_tokens=False,
             return_tensors=return_tensors,
         )
 
@@ -147,11 +176,24 @@ class LCLMProcessor:
         memory_positions = []
         for i in range(batch_size):
             input_ids = tokenized["input_ids"][i]
+            if targets is not None:
+                actual_prefix = input_ids[:prompt_lengths[i]].tolist()
+                if actual_prefix != prompt_token_ids[i]:
+                    raise ValueError(
+                        f"Batch item {i}: separately tokenized prompt is not a prefix "
+                        "of the full prompt+target sequence; cannot assign labels safely"
+                    )
             # Find all wrapped regions in the tokenized sequence
             positions = self._find_all_memory_token_positions(
                 input_ids, 
                 expected_chunks_per_region=all_latent_counts[i]
             )
+            if len(positions) != len(all_latent_counts[i]):
+                raise ValueError(
+                    f"Batch item {i}: found {len(positions)} memory regions after tokenization, "
+                    f"expected {len(all_latent_counts[i])}. The sequence may have been truncated "
+                    "or the memory special tokens were not registered atomically."
+                )
             memory_positions.append(positions)
 
         # Create labels if training
@@ -160,6 +202,12 @@ class LCLMProcessor:
             labels = tokenized["input_ids"].clone()
             for i, pr_len in enumerate(prompt_lengths):
                 labels[i, :pr_len] = -100
+                # Never train the decoder to reproduce latent placeholders or
+                # their delimiters, including target-side (CoT) memory regions.
+                for start_pos, end_pos in memory_positions[i]:
+                    memory_start_pos = max(0, start_pos - 1)
+                    memory_end_pos = min(labels.shape[1] - 1, end_pos)
+                    labels[i, memory_start_pos:memory_end_pos + 1] = -100
             labels = labels.masked_fill(tokenized["attention_mask"] == 0, -100)
 
         return {

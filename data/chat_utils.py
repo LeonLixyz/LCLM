@@ -7,6 +7,7 @@ passed to ``apply_chat_template`` without projecting them down to
 """
 
 from collections.abc import Mapping, Sequence
+import re
 from typing import Any, Dict, List, Optional, Tuple
 
 from transformers import PreTrainedTokenizerBase
@@ -148,6 +149,47 @@ def tokenize_qwen_agent_conversation(
     messages = _validate_messages(messages_data)
     if not messages:
         raise ValueError("messages must contain at least one chat message")
+
+    if getattr(tokenizer, 'is_fast', False):
+        # BPE can merge the assistant prefix's newline with leading payload
+        # whitespace. Token-prefix matching then rejects otherwise valid rows.
+        # Align characters first and use offsets from the full tokenization.
+        rendered = _apply_chat_template(tokenizer, messages, tokenize=False,
+            add_generation_prompt=False, tools=tools,
+            chat_template_kwargs=chat_template_kwargs)
+        encoded = tokenizer(rendered, add_special_tokens=False, return_offsets_mapping=True)
+        full_ids = list(encoded['input_ids'])
+        spans = []
+        cursor = 0
+        for message in messages:
+            if message['role'] != 'assistant':
+                continue
+            turn = _apply_chat_template(tokenizer, [message], tokenize=False,
+                add_generation_prompt=False, chat_template_kwargs=chat_template_kwargs)
+            prefix = '<|im_start|>assistant\n'
+            if not turn.startswith(prefix):
+                raise ValueError('Expected the unchanged Qwen3-Instruct ChatML template')
+            start = rendered.find(turn, cursor)
+            if start < 0:
+                raise ValueError('Cannot align assistant turn in complete Qwen conversation')
+            spans.append((start + len(prefix), start + len(turn)))
+            cursor = start + len(turn)
+        # Fail closed if message text injects extra ChatML turns; otherwise a
+        # quoted assistant turn inside a tool result could receive loss.
+        parsed = [(m.start(1), m.end()) for m in re.finditer(
+            r'<\|im_start\|>assistant\n(.*?)<\|im_end\|>\n', rendered, re.S)]
+        if parsed != spans:
+            raise ValueError('Ambiguous assistant boundaries in rendered ChatML')
+        mask = []
+        span_index = 0
+        for start, end in encoded['offset_mapping']:
+            while span_index < len(spans) and start >= spans[span_index][1]:
+                span_index += 1
+            mask.append(int(span_index < len(spans) and start < end
+                and spans[span_index][0] <= start and end <= spans[span_index][1]))
+        return {'input_ids': full_ids, 'attention_mask': [1] * len(full_ids),
+            'labels': [token if enabled else ignore_index for token, enabled in zip(full_ids, mask)],
+            'assistant_mask': mask}
 
     full_ids = _as_token_ids(
         _apply_chat_template(

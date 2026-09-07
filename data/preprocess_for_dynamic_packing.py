@@ -470,6 +470,10 @@ def _canonicalize_agent_messages(example: Dict[str, Any]) -> Optional[List[Dict[
     """Select one native trajectory field without truthiness/array ambiguity."""
     messages = example.get("messages")
     conversations = example.get("conversations")
+    if isinstance(messages, str):
+        messages = json.loads(messages)
+    if isinstance(conversations, str):
+        conversations = json.loads(conversations)
     if messages is not None and conversations is not None:
         if messages != conversations:
             raise ValueError("Agent row has conflicting messages and conversations fields")
@@ -479,6 +483,7 @@ def _canonicalize_agent_messages(example: Dict[str, Any]) -> Optional[List[Dict[
         return None
     if not isinstance(selected, list) or not selected:
         raise ValueError("Agent trajectory must be a nonempty list")
+    selected = [json.loads(message) if isinstance(message, str) else message for message in selected]
     if not all(isinstance(message, dict) for message in selected):
         raise ValueError("Agent trajectory messages must be dictionaries")
     return selected
@@ -739,9 +744,14 @@ def worker_process_example(args: Tuple[Dict[str, Any], int, str, Optional[int], 
     global _worker_tokenizer, _worker_embed_tokenizer, _worker_memory_start_id, _worker_memory_end_id, _worker_memory_id
 
     example, reference_chunk_size, prompt_column, max_seq_len, max_memory_tokens = args
+    # Parquet transports arbitrary per-row tool schemas as JSON, avoiding Arrow
+    # unions/casts that can silently erase parameters from heterogeneous tools.
+    example = dict(example)
     sub_dataset = example.get('sub_dataset', 'unknown')
 
     try:
+        if isinstance(example.get('tools'), str):
+            example['tools'] = json.loads(example['tools'])
         # Native agent trajectories use messages/conversations and intentionally
         # have no prompt/target split. They are handled below without compression.
         agent_messages = _canonicalize_agent_messages(example)
@@ -826,7 +836,6 @@ def worker_process_example(args: Tuple[Dict[str, Any], int, str, Optional[int], 
             tqdm.write(f"Warning: memory_strings ({len(memory_strings)}) != memory_positions ({len(memory_positions)}), sub_dataset={sub_dataset}")
             # Save problematic example for debugging
             try:
-                import json
                 import time
                 debug_dir = Path("data/debug_memory_mismatch")
                 debug_dir.mkdir(parents=True, exist_ok=True)
