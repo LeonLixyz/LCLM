@@ -1,6 +1,25 @@
 """Convert only TechQA training questions with exact, verified answer spans."""
 from collections import Counter
 
+def build_expansion_task(row, documents):
+    from data.full_expansion_tasks import build_task, word_chunks
+    identifier = row['task_id']; document = documents[row['document_id']]
+    if not identifier.startswith('TRAIN_') or row.get('source_split') != 'training_Q_A.json':
+        raise ValueError('non_training_question')
+    text = document['text']; start = row['start_offset']; end = row['end_offset']
+    if not 0 <= start < end <= len(text) or text[start:end] != row['answer']:
+        raise ValueError('answer_span_mismatch')
+    task = build_task('techqa','PrimeQA/TechQA',identifier,row['question'],row['answer'],
+        [document],list(documents.values()),seed=20260907)
+    pieces = list(word_chunks(text))
+    segments = {s['record_id']:s['text'] for s in task['segments']}
+    if any(not segments[document['document_id']+f':part{i}'].startswith(piece)
+           for i,piece in enumerate(pieces)):
+        raise ValueError('original_document_chunk_changed')
+    task['source_evidence_span'] = {'document_id':row['document_id'],'start':start,'end':end}
+    task['source_split'] = row['source_split']
+    return task
+
 def reference_documents(rows):
     if isinstance(rows, dict):
         rows = list(rows.values())

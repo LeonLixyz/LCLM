@@ -49,7 +49,35 @@ removed, while retaining its task and final-answer contract.
 Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
 `/data/stage3-build-20260906/validation/` on the data volume.
 
-## Latest checkpoint — 2026-09-07 14:22 EDT
+## Latest checkpoint — 2026-09-07 14:48 EDT
+
+- Full V6 teacher still running in `ap-UXSWSfrR3pbU6soJrhFl1B`; do not duplicate.
+  Latest inspected MultiDoc2Dial report has 2,500 new attempts after resume,
+  **10,615 cumulative attempts / 6,196 accepted**. No later source has completed
+  yet; the eight completed source audits remain valid.
+- Supplemental TechQA prompt build completed in `ap-Vzy7dS7sSUN2yQqlLqTXtV`:
+  **393 tasks**, 54 with multi-segment support, 3,151 total segments, minimum
+  **705 Qwen tokens** per segment. Three of the 396 eligible questions were
+  excluded because complete original source documents exceed 12 segments.
+  Exact answer offsets are revalidated and every original support chunk is
+  checked for preservation. Distractors/padding use only the 348-document
+  retained training pool, with held-out answer documents excluded.
+- Supplemental files are on the data volume under
+  `/data/stage3-agent/real-expansion/pilots/techqa-supplement-20260907-v1/`:
+  `techqa.tasks.jsonl`, `techqa.build.json`, and `preview-tasks.json`.
+  Task-file SHA256: `8cde837935d354693289d82d19a61ea2289bb41e51584da1e6d268e3bd4947f4`.
+  **These are prompt tasks, not generated traces, and are not included in the
+  running 15-source build.** Next gate is a separate Qwen-235B pilot with
+  source-appropriate answer verification and semantic review before inclusion.
+- Focused tests: **133 passed** plus eight real-Qwen boundary cases,
+  `ap-ofyiO3KScDkJaJzgnGiu1s`. Initial supplemental launch failed during local
+  image assembly because concurrent imports modified a nested `.pyc`; added
+  explicit recursive bytecode exclusions to the shared Modal image and retried
+  successfully. No generation data was modified by that failed launch.
+- Main release remains pending complete generation, audits for later sources,
+  semantic/source-notice review, export, packing and final packed/GPU tests.
+
+## Historical checkpoint — 2026-09-07 14:22 EDT
 
 - Resumed teacher **healthy and generating** in `ap-UXSWSfrR3pbU6soJrhFl1B`.
   vLLM began serving at 18:15:23 UTC and active inference was observed. Latest

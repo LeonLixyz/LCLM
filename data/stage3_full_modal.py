@@ -9,7 +9,8 @@ volume = modal.Volume.from_name('lclm-stage3-data')
 image = modal.Image.debian_slim(python_version='3.11').pip_install(
     'datasets==3.6.0', 'huggingface_hub>=0.36,<2', 'pyarrow>=18,<22',
     'transformers==4.57.1', 'pytest', 'jinja2>=3.1',
-).env({'PYTHONPATH':'/opt/lclm'}).add_local_dir('.', '/opt/lclm', ignore=['.git', '.venv', '__pycache__', '_modal_run'])
+).env({'PYTHONPATH':'/opt/lclm'}).add_local_dir('.', '/opt/lclm', ignore=[
+    '.git', '.venv', '__pycache__', '**/__pycache__/**', '**/*.pyc', '_modal_run'])
 app = modal.App('lclm-stage3-full-20260906-' + os.environ.get('LCLM_STAGE3_JOB', 'agents'))
 
 @app.function(image=image, cpu=8, memory=32768, timeout=86400,
