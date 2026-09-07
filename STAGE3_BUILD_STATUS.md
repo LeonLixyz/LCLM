@@ -49,7 +49,38 @@ removed, while retaining its task and final-answer contract.
 Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
 `/data/stage3-build-20260906/validation/` on the data volume.
 
-## Latest checkpoint — 2026-09-07 02:56 EDT
+## Latest checkpoint — 2026-09-07 14:13 EDT
+
+- Original full V6 app `ap-AClcBdi6IpX7cwvr24zc0m` **stopped at 11:33 EDT**.
+  Logs show an input cancellation signal at 15:32:53 UTC, followed by worker
+  shutdown; they do not identify the initiator. Do not describe this as a
+  model failure or a completed run.
+- Read-only checkpoint audit **passed** in `ap-r2V9O6xkEOve7r87c3np6M`:
+  **69,095 persisted attempts / 29,791 accepted**. Every output task ID belongs
+  to its input shard, no duplicate IDs or incomplete JSONL lines were found,
+  verdicts match accepted/rejected files, and all eight completed source reports
+  agree with actual row counts. Per-file SHA256 values and counts are saved at
+  `/data/stage3-build-20260906/expansion-resume-audit.json`.
+- Completed sources (accepted / attempted): MAUD **11,851 / 23,016**, FinQA
+  **1,270 / 6,191**, PubMedQA **233 / 450**, CLAPNQ **622 / 989**, ContractNLI
+  **5,246 / 7,191**, TATQA **4,055 / 13,223**, ConvFinQA **325 / 2,090**,
+  MultiHiertt **1,658 / 7,830**. MultiDoc2Dial is partial: **4,531 / 8,115**
+  persisted, with 13,336 remaining tasks in that source.
+- **Resume submitted in detached mode:** `ap-UXSWSfrR3pbU6soJrhFl1B`, using the
+  same V6 manifest, task root, output root, model revision and verification
+  rules. Model startup is not yet confirmed at this checkpoint. Do not launch
+  another run; inspect this app and saved progress first. Completed task IDs
+  are skipped, including the eight complete sources. All 374,755 prompt tasks
+  remain in scope; no partial export or HF release has been made.
+- New checkpoint-audit tests passed with the focused suite: **109 tests** plus
+  eight actual-Qwen boundary cases, `ap-I8ZuOnxntxbLwDi1taNRCA`. The first audit
+  attempt (`ap-aVshGELisZ6xaukc6KswaQ`) was canceled after a client disconnect;
+  its detached retry above completed. Use detached mode for long future jobs.
+- Next: confirm resumed teacher health and renewed MultiDoc2Dial progress;
+  continue source review. Export/pack only after all source accounting passes,
+  then final actual-expansion artifact/GPU validation and publication gates.
+
+## Historical checkpoint — 2026-09-07 02:56 EDT
 
 - Full V6 generation remains active in `ap-AClcBdi6IpX7cwvr24zc0m`; do not
   duplicate it. Latest inspected MAUD progress: **3,200 attempted / 802 accepted**,

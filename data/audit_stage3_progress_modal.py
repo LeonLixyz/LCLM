@@ -68,7 +68,7 @@ def test():
         'tests/test_expansion_numeric_normalization.py','tests/test_real_expansion_agent.py',
         'tests/test_harvest_expansion_trace.py','tests/test_packed_file_discovery.py',
         'tests/test_expansion_semantic_review.py','tests/test_pubmedqa_split.py',
-        'tests/test_techqa_adapter.py','-q'],
+        'tests/test_techqa_adapter.py','tests/test_expansion_checkpoint_audit.py','-q'],
         cwd='/opt/lclm',capture_output=True,text=True)
     report={'exit_code':result.returncode,'output':result.stdout+result.stderr}
     if result.returncode==0:
