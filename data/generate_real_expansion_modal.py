@@ -182,6 +182,20 @@ class RealExpansionGenerator:
             output_root=DATA_ROOT/'full-20260906-v5-audit',pilot_limit=32)
 
     @modal.method()
+    def semantic_review(self) -> dict[str, Any]:
+        from openai import OpenAI
+        from data.expansion_semantic_review import review_pilot
+        data_volume.reload()
+        client = OpenAI(api_key='not-needed', base_url=f'http://127.0.0.1:{MODEL_PORT}/v1', timeout=300, max_retries=2)
+        def complete(messages):
+            response = client.chat.completions.create(model=SERVED_MODEL_NAME,
+                messages=messages, temperature=0, max_tokens=512,
+                extra_body={'chat_template_kwargs': {'enable_thinking': False}})
+            return response.choices[0].message.content
+        return review_pilot(DATA_ROOT/'full-20260906-v5-audit', complete,
+                            data_volume.commit, MODEL_ID, MODEL_REVISION)
+
+    @modal.method()
     def generate(
         self,
         *,
@@ -353,7 +367,13 @@ def main(
     temperature: float = 0.0,
     full: bool = False,
     audit_full: bool = False,
+    semantic_review: bool = False,
 ) -> None:
+    if sum((full, audit_full, semantic_review)) > 1:
+        raise ValueError('Choose only one full/pilot/semantic review mode')
+    if semantic_review:
+        print(json.dumps(RealExpansionGenerator().semantic_review.remote(), indent=2))
+        return
     if audit_full:
         print(json.dumps(RealExpansionGenerator().audit_full.remote(),indent=2))
         return

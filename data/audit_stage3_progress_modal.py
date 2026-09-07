@@ -38,7 +38,8 @@ def audit():
     for version in ['v4','v5']:
         pilot=source.parent/f'full-20260906-{version}-audit'
         out['pilot_'+version]={p.name:json.loads(p.read_text()) for p in sorted(pilot.glob('*.json'))
-            if 'manifest' not in p.name}
+            if 'manifest' not in p.name and p.name not in {'review-samples.json','review-errors.json'}
+            and not p.name.startswith('semantic-review-')}
     (ROOT/'progress-audit.json').write_text(json.dumps(out,indent=2));volume.commit()
     return out
 
@@ -53,7 +54,8 @@ def test():
         'tests/test_clean_agent_trajectories.py','tests/test_chat_utils.py','tests/test_preprocess_for_dynamic_packing.py',
         'tests/test_stage3_release_checks.py','tests/test_expansion_judge_json.py',
         'tests/test_expansion_numeric_normalization.py','tests/test_real_expansion_agent.py',
-        'tests/test_harvest_expansion_trace.py','tests/test_packed_file_discovery.py','-q'],
+        'tests/test_harvest_expansion_trace.py','tests/test_packed_file_discovery.py',
+        'tests/test_expansion_semantic_review.py','-q'],
         cwd='/opt/lclm',capture_output=True,text=True)
     report={'exit_code':result.returncode,'output':result.stdout+result.stderr}
     if result.returncode==0:

@@ -49,7 +49,49 @@ removed, while retaining its task and final-answer contract.
 Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
 `/data/stage3-build-20260906/validation/` on the data volume.
 
-## Latest checkpoint — 2026-09-07 00:43 EDT
+## Latest checkpoint — 2026-09-07 01:27 EDT
+
+- Base packing and recovery are **complete, all 64 partitions each**. Combined
+  accounting passes: 20,326,114 input rows = **20,286,582 packed rows** + 27,634
+  overlength + 11,897 under 18 tokens + 1 processing rejection. The packed count
+  includes 334,260 recovered legacy BPE-prefix rows without duplication.
+  Baseline has 1,071,885 packs; recovery has 45,546. Do not restart these jobs.
+- Native agents remain complete: **1,244,170 cleaned raw / 1,230,344 packed
+  trajectories**, with the requested Nemotron search/tool_calling subsets and
+  OpenThoughts. All native rows are uncompressed. See subset counts below.
+- V5 pilot completed **480 attempts / 247 accepted by its verifier**, across
+  all 15 sources. A format audit of every accepted trace passed: exact expand
+  bodies, explicit saved task system and tools, no teacher system in training
+  messages, all assistant calls supervised, observations masked, and every
+  segment at least **642 actual Qwen tokens**. There are 92 multi-expansion
+  trajectories (distinct segments >1). This is NOT semantic release approval.
+- Manual inspection of two accepted examples per source found suspicious
+  free-form false positives: CLAPNQ `rea3-3927e0f41235145cef2c2067` asks for the
+  father of the convention but answers its president; BillSum
+  `rea3-a28561e3e68c11ed1bf74dcd` claims the bill establishes an authority whereas
+  the reference describes amendments involving an existing authority.
+  **Do not write review-passed.json or start full generation yet.**
+- A diagnostic Qwen-235B semantic re-review is running in
+  **`ap-mrHiNmdGgFMahqjOvLKFyy`**, H200:8, covering all 96 accepted free-form
+  pilot answers plus 19 PubMedQA answers. It separately checks question/evidence
+  without the reference, then with the reference, and requires both judgments.
+  This does not alter trajectories or approve release. Expected report:
+  `full-20260906-v5-audit/semantic-review-question-first-every-claim-v1.json`.
+  Inspect the two suspect-example outcomes and other rejected/kept samples.
+  If useful, integrate the calibrated filter with a new versioned generation
+  manifest/output before scaling; it is currently diagnostic only.
+- Latest focused tests: **64 passed**, plus eight pinned real-tokenizer
+  boundary cases (app `ap-Ek8OEjfTkuTlKyNMbra5tT`). Earlier full 152-test,
+  actual-packed-artifact, NCCL/DDP and FSDP results below remain valid for the
+  packing/training code. Final expansion integration still must be run.
+- No new complete raw/packed HF release has been uploaded. Full expansion
+  generation has not started. Earlier source-license/split exclusions remain.
+
+Pilot audit files are on `lclm-stage3-data` under
+`/data/stage3-agent/real-expansion/pilots/full-20260906-v5-audit/`:
+`format-audit.json`, `review-samples.json`, and `review-errors.json`.
+
+## Historical checkpoint — 2026-09-07 00:43 EDT
 
 ### Follow-up checkpoint — 2026-09-07 00:57 EDT
 
