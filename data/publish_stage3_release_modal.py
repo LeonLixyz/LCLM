@@ -12,7 +12,7 @@ PACKED_REPO=RAW_REPO+'-packed-cs16-32k'
               secrets=[modal.Secret.from_name('huggingface')])
 def publish():
     from huggingface_hub import HfApi
-    from data.stage3_release_checks import validate_base_recovery,validate_expansion_completion
+    from data.stage3_release_checks import validate_base_recovery,validate_expansion_completion,validate_final_artifact_audit
     reports={}
     for kind in ('base','agents','expansion'):
         root=ROOT/f'packed-{kind}-cs16-32768'
@@ -30,6 +30,8 @@ def publish():
     validation=json.loads((ROOT/'validation/report.json').read_text())
     if not {'pytest','packed_artifacts','nccl','fsdp'}<=set(r['check'] for r in validation) or any(r['exit_code'] for r in validation):
         raise RuntimeError('Validation gate is not green')
+    artifact_audit=json.loads((ROOT/'validation/packed-artifact-audit.json').read_text())
+    validate_final_artifact_audit(artifact_audit)
     prefix_tests=json.loads((ROOT/'validation/prefix-recovery-tests.json').read_text())
     if prefix_tests['exit_code'] or len(prefix_tests.get('real_tokenizer_boundary_cases',[]))!=8:
         raise RuntimeError('Prefix-recovery validation is not green')
@@ -76,7 +78,9 @@ def publish():
         'expansion_generation_counts':generation_counts,
         'expansion_source_provenance':provenance,
         'source_revisions':json.loads((ROOT/'agent-source-manifest.json').read_text()),
-        'validation':validation,'review':json.loads(review_path.read_text())}
+        'validation':validation,'packed_artifact_audit':artifact_audit,
+        'tokenizer_provenance_note':'Expansion packing pins decoder and encoder revisions in partition reports. Earlier base/native/recovery packs loaded main without explicit revisions; the final pinned-tokenizer artifact audit is sampled validation, not retroactive build provenance.',
+        'review':json.loads(review_path.read_text())}
     for repo in (RAW_REPO,PACKED_REPO):
         api.upload_file(repo_id=repo,repo_type='dataset',path_or_fileobj=json.dumps(summary,indent=2).encode(),path_in_repo='build-manifest.json')
     raw_card='''---

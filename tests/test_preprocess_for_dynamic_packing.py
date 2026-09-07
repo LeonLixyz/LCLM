@@ -88,6 +88,29 @@ def _install_worker_tokenizer(monkeypatch):
     return tokenizer
 
 
+@pytest.mark.parametrize('pinned', [False, True])
+def test_worker_passes_optional_tokenizer_revisions(monkeypatch, pinned):
+    calls = []
+    def load(name, **options):
+        calls.append((name, options))
+        tokenizer = FakeQwenTokenizer()
+        tokenizer.pad_token = None
+        return tokenizer
+    for name in ('_worker_tokenizer', '_worker_embed_tokenizer',
+                 '_worker_memory_start_id', '_worker_memory_end_id', '_worker_memory_id'):
+        monkeypatch.setattr(preprocessing, name, None)
+    monkeypatch.setattr(preprocessing.AutoTokenizer, 'from_pretrained', load)
+    if pinned:
+        preprocessing.worker_init('decoder', 'encoder', 'decoder-sha', 'encoder-sha')
+    else:
+        preprocessing.worker_init('decoder', 'encoder')
+    assert calls == [
+        ('decoder', {'use_fast': True, **({'revision': 'decoder-sha'} if pinned else {})}),
+        ('encoder', {'use_fast': True, **({'revision': 'encoder-sha'} if pinned else {})}),
+    ]
+    assert preprocessing._worker_tokenizer.pad_token == '<eos>'
+
+
 class FastNewlineTokenizer(FakeQwenTokenizer):
     is_fast = True
 

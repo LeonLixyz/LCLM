@@ -3,6 +3,25 @@ import pytest
 from data.stage3_release_checks import validate_base_recovery
 from data.stage3_release_checks import validate_expansion_completion
 from data.stage3_release_checks import validate_pilot_review
+from data.stage3_release_checks import validate_final_artifact_audit
+
+
+def test_final_artifact_audit_requires_expansion():
+    validate_final_artifact_audit({'status':'passed',
+        'components':['base','agents','base_recovery','expansion']})
+
+
+@pytest.mark.parametrize('components', [[], ['base','agents','base_recovery'],
+    ['base','agents','base_recovery','expansion','expansion']])
+def test_partial_or_duplicate_artifact_audit_cannot_publish(components):
+    with pytest.raises(ValueError):
+        validate_final_artifact_audit({'status':'passed','components':components})
+
+
+def test_failed_artifact_audit_cannot_publish():
+    with pytest.raises(ValueError):
+        validate_final_artifact_audit({'status':'failed',
+            'components':['base','agents','base_recovery','expansion']})
 
 
 def reports():

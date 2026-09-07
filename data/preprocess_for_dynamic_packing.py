@@ -725,13 +725,15 @@ _worker_memory_end_id = None
 _worker_memory_id = None
 
 
-def worker_init(tokenizer_name: str, embed_tokenizer_name: str = None):
+def worker_init(tokenizer_name: str, embed_tokenizer_name: str = None,
+                tokenizer_revision: str = None, embed_tokenizer_revision: str = None):
     """Initialize tokenizers in worker process."""
     global _worker_tokenizer, _worker_embed_tokenizer, _worker_memory_start_id, _worker_memory_end_id, _worker_memory_id
 
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-    _worker_tokenizer = AutoTokenizer.from_pretrained(tokenizer_name, use_fast=True)
+    decoder_options = {'revision': tokenizer_revision} if tokenizer_revision else {}
+    _worker_tokenizer = AutoTokenizer.from_pretrained(tokenizer_name, use_fast=True, **decoder_options)
     if _worker_tokenizer.pad_token is None:
         _worker_tokenizer.pad_token = _worker_tokenizer.eos_token
 
@@ -745,7 +747,8 @@ def worker_init(tokenizer_name: str, embed_tokenizer_name: str = None):
 
     # Load embed tokenizer for accurate code length estimation
     if embed_tokenizer_name:
-        _worker_embed_tokenizer = AutoTokenizer.from_pretrained(embed_tokenizer_name, use_fast=True)
+        encoder_options = {'revision': embed_tokenizer_revision} if embed_tokenizer_revision else {}
+        _worker_embed_tokenizer = AutoTokenizer.from_pretrained(embed_tokenizer_name, use_fast=True, **encoder_options)
     else:
         _worker_embed_tokenizer = None
 

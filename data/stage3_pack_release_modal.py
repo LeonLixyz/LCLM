@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 import modal
+from data.stage3_tokenizers import DECODER,DECODER_REVISION,ENCODER,ENCODER_REVISION
 
 ROOT=Path('/data/stage3-build-20260906')
 volume=modal.Volume.from_name('lclm-stage3-data')
@@ -58,7 +59,7 @@ def pack_partition(partition:int,total:int=64,kind:str='base'):
         counts['packed_batches']+=1
         counts['packed_rows']+=len(batch)
     with mp.get_context('spawn').Pool(8,initializer=worker_init,
-            initargs=('Qwen/Qwen3-4B-Instruct-2507','Qwen/Qwen3-Embedding-0.6B')) as pool:
+            initargs=(DECODER,ENCODER,DECODER_REVISION,ENCODER_REVISION)) as pool:
         for row in pool.imap_unordered(worker_process_example,inputs(),chunksize=16):
             if row is None:counts['rejected_processing']+=1;continue
             if row.get('_skipped_max_seq_len'):counts['over_32768']+=1;continue
@@ -79,6 +80,7 @@ def pack_partition(partition:int,total:int=64,kind:str='base'):
         'counts':dict(counts),'sub_datasets':dict(source_counts),'reference_chunk_size':16,
         'max_packed_length':32768,'decoder_tokenizer':'Qwen/Qwen3-4B-Instruct-2507',
         'encoder_tokenizer':'Qwen/Qwen3-Embedding-0.6B',
+        'decoder_tokenizer_revision':DECODER_REVISION,'encoder_tokenizer_revision':ENCODER_REVISION,
         'base_prefix_recovery_separate':kind=='base',
         'format':'dynamic packed: decoder pretokenized; encoder memory strings tokenized at runtime'}
     complete.write_text(json.dumps(report,indent=2));volume.commit()

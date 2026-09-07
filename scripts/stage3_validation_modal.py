@@ -14,13 +14,13 @@ image = (modal.Image.from_registry('pytorch/pytorch:2.8.0-cuda12.9-cudnn9-devel'
 
 @app.function(image=image,gpu='H200:8',cpu=16,memory=65536,timeout=3600,
               volumes={'/data':volume})
-def validate():
+def validate(intermediate:bool=False):
     output=Path('/data/stage3-build-20260906/validation')
     output.mkdir(parents=True,exist_ok=True)
     results=[]
     for name,command in [
         ('pytest',['python','-m','pytest','tests','-q','--disable-warnings']),
-        ('packed_artifacts',['python','scripts/stage3_packed_artifact_audit.py']),
+        ('packed_artifacts',['python','scripts/stage3_packed_artifact_audit.py']+([] if intermediate else ['--require-expansion'])),
         ('nccl',['torchrun','--standalone','--nproc_per_node=2','scripts/stage3_nccl_smoke.py']),
         ('fsdp',['torchrun','--standalone','--nproc_per_node=2','scripts/stage3_nccl_smoke.py','--fsdp']),
     ]:
@@ -28,10 +28,10 @@ def validate():
         (output/f'{name}.log').write_text(run.stdout+'\n'+run.stderr)
         results.append({'check':name,'exit_code':run.returncode,'tail':(run.stdout+'\n'+run.stderr)[-10000:]})
         volume.commit()
-    (output/'report.json').write_text(json.dumps(results,indent=2))
+    (output/('intermediate-report.json' if intermediate else 'report.json')).write_text(json.dumps(results,indent=2))
     volume.commit()
     return results
 
 @app.local_entrypoint()
-def main():
-    print(json.dumps(validate.remote(),indent=2))
+def main(intermediate:bool=False):
+    print(json.dumps(validate.remote(intermediate),indent=2))

@@ -6,14 +6,14 @@ from pathlib import Path
 import pyarrow.parquet as pq
 from transformers import AutoTokenizer
 from data.dynamic_packing_dataset import DynamicPackedDataset
+from data.stage3_tokenizers import DECODER,DECODER_REVISION,ENCODER,ENCODER_REVISION
 
 
-def main():
+def main(require_expansion=False):
     root=Path('/data/stage3-build-20260906')
-    decoder=AutoTokenizer.from_pretrained('Qwen/Qwen3-4B-Instruct-2507',
-        revision='cdbee75f17c01a7cc42f958dc650907174af0554')
+    decoder=AutoTokenizer.from_pretrained(DECODER,revision=DECODER_REVISION)
     decoder.add_special_tokens({'additional_special_tokens':['<|memory_start|>','<|memory_end|>','<|memory|>']})
-    encoder=AutoTokenizer.from_pretrained('Qwen/Qwen3-Embedding-0.6B')
+    encoder=AutoTokenizer.from_pretrained(ENCODER,revision=ENCODER_REVISION)
     sample=object.__new__(DynamicPackedDataset)
     sample.decoder_tokenizer=decoder;sample.embed_tokenizer=encoder;sample.compression_ratio=16
     sample.memory_start_id=decoder.convert_tokens_to_ids('<|memory_start|>')
@@ -21,9 +21,12 @@ def main():
     sample.memory_end_id=decoder.convert_tokens_to_ids('<|memory_end|>')
     sample.pooling='mean'
     report=[]
+    components=[('base','packed-base-cs16-32768'),('agents','packed-agents-cs16-32768'),
+                ('base_recovery','packed-base-prefix-recovery')]
+    if require_expansion:
+        components.append(('expansion','packed-expansion-cs16-32768'))
     with tempfile.TemporaryDirectory(prefix='lclm-release-loader-') as directory:
-        for kind,folder in [('base','packed-base-cs16-32768'),('agents','packed-agents-cs16-32768'),
-                            ('base_recovery','packed-base-prefix-recovery')]:
+        for kind,folder in components:
             parts=sorted((root/folder).glob('part-*/report.json'))
             assert parts,f'No completed {kind} partitions'
             for marker in sorted(set([parts[0],parts[len(parts)//2],parts[-1]])):
@@ -48,6 +51,7 @@ def main():
                     assert length<=32768,f'Actual expanded pack exceeds limit: {file}: {length}'
                     assert labeled>0
                     if kind=='agents':assert memories==0
+                    if kind=='expansion':assert memories>0
                     report.append({'file':str(file),'examples':len(examples),
                         'expanded_tokens':length,'memory_blocks':memories,'labeled_tokens':labeled})
         rank_lengths=[]
@@ -62,9 +66,15 @@ def main():
             assert sum(batch['sample_lens'][0])<=32768
         assert rank_lengths[0]==rank_lengths[1]
     output={'status':'passed','sampled_packs':report,'two_rank_loader_lengths':rank_lengths,
-            'scope':'Sampled actual base/native/recovery packs, not a full artifact scan or production model run'}
+            'components':[k for k,_ in components],
+            'decoder_tokenizer_revision':DECODER_REVISION,'encoder_tokenizer_revision':ENCODER_REVISION,
+            'scope':'Sampled actual component packs, not a full artifact scan or production model run'}
     (root/'validation/packed-artifact-audit.json').write_text(json.dumps(output,indent=2))
     print(json.dumps(output,indent=2))
 
 
-if __name__=='__main__':main()
+if __name__=='__main__':
+    import argparse
+    parser=argparse.ArgumentParser()
+    parser.add_argument('--require-expansion',action='store_true')
+    main(parser.parse_args().require_expansion)

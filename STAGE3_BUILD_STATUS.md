@@ -49,7 +49,37 @@ removed, while retaining its task and final-answer contract.
 Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
 `/data/stage3-build-20260906/validation/` on the data volume.
 
-## Latest checkpoint — 2026-09-07 02:28 EDT
+## Latest checkpoint — 2026-09-07 02:58 EDT
+
+- Full V6 generation remains active in `ap-AClcBdi6IpX7cwvr24zc0m`; do not
+  duplicate it. Latest inspected MAUD progress: **3,200 attempted / 802 accepted**,
+  2,347 wrong answers, 39 missing support, 12 generation ValueErrors. This is a
+  partial first-source count, not the full 374,755-task outcome.
+- TechQA's training-only adapter is implemented and materialized on Modal in
+  `ap-3bprag3yt5IGpx5DKLFOny`. Of 600 official training questions, **396 retained**,
+  150 unanswerable excluded, 54 excluded for dev/validation answer-document
+  overlap. All retained answers match exact original document offsets; the
+  pool has **348 original documents**. Data, report, upstream README and license
+  are under `sources/techqa/materialized_train_v1` within the real-expansion root.
+  This is supplemental preparation, **not part of the running 15-source build**;
+  it still needs long-segment task construction and its own reviewed pilot.
+- Future release packing now pins decoder and encoder tokenizers. Encoder:
+  `Qwen/Qwen3-Embedding-0.6B@97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3`.
+  Earlier base/native/recovery packs loaded main without explicit revisions.
+  Do not retroactively claim pinned build provenance for them; final sampled
+  validation uses pinned tokenizers and records that limitation in the manifest.
+- Final GPU validation now requires actual expansion packs by default. An
+  explicit intermediate mode writes a separate report. Publication additionally
+  rejects an artifact audit missing any of base/native/recovery/expansion.
+- Focused Modal tests: **103 passed**, plus all eight real-Qwen boundary cases,
+  `ap-XHBFVLn6nIMpwnsGnhZLTM`. New tests cover optional tokenizer revision
+  forwarding, final component gates and TechQA split/answer-span checks.
+  The final expansion packed/GPU integration and HF release remain pending.
+- Next: monitor full generation; resume only after confirming it stopped and
+  inspecting persisted reports. Export/pack only after complete generation
+  accounting passes, then run final integration and source-notice review.
+
+## Historical checkpoint — 2026-09-07 02:28 EDT
 
 - **Full V6 generation submitted:** `ap-AClcBdi6IpX7cwvr24zc0m`, Qwen3-235B
   Instruct on H200:8, output `full-20260906-v6`, input root

@@ -1,5 +1,12 @@
 """Pure count checks shared by release publication and tests."""
 
+def validate_final_artifact_audit(audit):
+    required = {'base', 'agents', 'base_recovery', 'expansion'}
+    components = audit.get('components', [])
+    if (audit.get('status') != 'passed' or set(components) != required
+            or len(components) != len(required)):
+        raise ValueError('Final artifact validation must include every component, including expansion')
+
 def validate_pilot_review(generation, audit, review):
     import hashlib
     import json
