@@ -1,0 +1,24 @@
+{
+  "source": "watsonx_docs_qa",
+  "status": "sample_review_passed",
+  "approved_for_release": false,
+  "scope": "Two deterministic full-run samples; not proof of correctness of every accepted row or final release approval",
+  "accepted_file_sha256": "3c2208a777497c6409ef9ce18e9af6b374d860d27101ed880bb6c5207bdd352d",
+  "sample_artifact": "/data/stage3-build-20260906/full-expansion-manual-review-samples/watsonx_docs_qa.json",
+  "reviewed_examples": [
+    {
+      "task_id": "rea3-7605e2bfa778b0f05879292b",
+      "category": "multi",
+      "result": "pass",
+      "evidence": "FAQ part1 explicitly says to toggle AI guardrails on, describes replacing harmful sentences in prompt/output with a removal message, and requires reviewing foundation-model outputs for bias/inaccuracy. Every final-answer claim is supported by that supplied document.",
+      "efficiency_note": "The trace expands all five FAQ chunks even though part1 alone supports this answer. Whole-document support coverage inflates calls; this is not necessary five-hop reasoning."
+    },
+    {
+      "task_id": "rea3-a83ad1b73f3c877d3cb2ac6d",
+      "category": "single",
+      "result": "pass",
+      "evidence": "The expanded OpenScale overview supports outcome monitoring, fairness/explainability/compliance, accuracy drift, governance, the four interface areas and default/custom evaluations. The answer is verbose but all substantive claims are grounded. Appended candlestick-chart padding is not used."
+    }
+  ],
+  "trajectory_checks": "Read task, reference, saved system, expand schema, native arguments, all five complete FAQ tool bodies and the complete single-expansion body, and final answers. User memory fidelity was covered by the separate all-row format audit. This assesses grounding in the pinned source text, not present-day product behavior."
+}

@@ -20,6 +20,21 @@ def selection_digest(selection):
     return hashlib.sha256(json.dumps(selection, sort_keys=True).encode()).hexdigest()
 
 
+def validate_source_sample_review(source, audit, samples, review):
+    """A format pass cannot override a failed or missing manual sample review."""
+    expected = {x['training_row']['task_id']: x['category'] for x in samples.get('examples', [])}
+    checked = review.get('reviewed_examples', [])
+    actual = {x['task_id']: x['category'] for x in checked}
+    if (not expected or len(expected) != len(samples['examples'])
+            or len(actual) != len(checked) or expected != actual
+            or samples.get('source') != source or review.get('source') != source
+            or samples.get('accepted_file_sha256') != audit['accepted_file_sha256']
+            or review.get('accepted_file_sha256') != audit['accepted_file_sha256']
+            or review.get('status') != 'sample_review_passed'
+            or any(x.get('result') != 'pass' for x in checked)):
+        raise ValueError('Missing, failed or stale source manual review: ' + source)
+
+
 def validate_replacement(generation, report, audit, review, manifest_sha, accepted_ids):
     from data.stage3_release_checks import validate_expansion_completion, validate_expansion_format_audits
     counts = validate_expansion_completion(generation, [report], {
@@ -87,12 +102,17 @@ def load_selection(root):
         raise ValueError('Corrective accepted file changed after audit')
     repair_sha = hashlib.sha256(repair_manifest).hexdigest()
     validate_replacement(repaired, repair_report, repair_audit, repair_review, repair_sha, ids)
-    reports = []; audits = []; inputs = []; manifests = {}; entries = []
+    reports = []; audits = []; inputs = []; manifests = {}; entries = []; manual_reviews = []
     for original in original_reports:
         source = original['source']; corrected = source == 'multidoc2dial'
         directory = REPAIR if corrected else MAIN
         report = repair_report if corrected else original
         audit = repair_audit if corrected else read(root / 'full-expansion-format-audit' / (source + '.json'))
+        if not corrected:
+            review_root = root / 'full-expansion-manual-review-samples'
+            source_review = read(review_root / (source + '.review.json'))
+            validate_source_sample_review(source, audit, read(review_root / (source + '.json')), source_review)
+            manual_reviews.append(source_review)
         manifests[source] = repair_sha if corrected else hashlib.sha256(main_manifest).hexdigest()
         path = directory / (source + '.accepted.jsonl')
         reports.append(report); audits.append(audit); inputs.append(path)
@@ -109,6 +129,7 @@ def load_selection(root):
     selection = {'version': 'v6-with-chronological-md2d-replacement-v1', 'sources': entries,
                  'counts': counts, 'corrective_input_provenance': repaired['manifest']['input_provenance'],
                  'corrective_release_review': repair_review,
+                 'source_sample_reviews': manual_reviews,
                  'original_main_counts': validate_expansion_completion(generation, original_reports, provenance)}
     return {'selection': selection, 'selection_sha256': selection_digest(selection),
             'inputs': inputs, 'format_audits': audits, 'source_reports': reports,

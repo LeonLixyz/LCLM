@@ -79,6 +79,24 @@ def test_publication_rechecks_actual_source_bytes(tmp_path):
     with pytest.raises(ValueError, match='changed after audit'): selection.verify_selected_files(selected)
 
 
+@pytest.mark.parametrize('failure', [None, 'failed_status', 'failed_example', 'missing', 'stale', 'different_id'])
+def test_manual_review_is_required_even_after_format_pass(failure):
+    _, _, audit, _, _, _ = fixture()
+    sample = {'source': 'multidoc2dial', 'accepted_file_sha256': audit['accepted_file_sha256'],
+              'examples': [{'category': 'single', 'training_row': {'task_id': 'example'}}]}
+    review = {'source': 'multidoc2dial', 'status': 'sample_review_passed',
+              'accepted_file_sha256': audit['accepted_file_sha256'],
+              'reviewed_examples': [{'task_id': 'example', 'category': 'single', 'result': 'pass'}]}
+    if failure == 'failed_status': review['status'] = 'sample_review_failed'
+    elif failure == 'failed_example': review['reviewed_examples'][0]['result'] = 'fail'
+    elif failure == 'missing': review = {}
+    elif failure == 'stale': review['accepted_file_sha256'] = 'c'*64
+    elif failure == 'different_id': review['reviewed_examples'][0]['task_id'] = 'other'
+    if failure:
+        with pytest.raises(ValueError): selection.validate_source_sample_review('multidoc2dial', audit, sample, review)
+    else: selection.validate_source_sample_review('multidoc2dial', audit, sample, review)
+
+
 def test_changed_release_entrypoints_parse():
     import ast
     from pathlib import Path
@@ -115,6 +133,12 @@ def test_selection_loader_replaces_instead_of_appending(tmp_path, monkeypatch):
         write(main/(source+'.generation.json'), {'source': source, 'status': 'complete', 'reasons': {'accepted:qwen_semantic': 2}})
         write(root/'full-expansion-format-audit'/(source+'.json'), {**a, 'source': source,
               'generation_manifest_file_sha256': main_digest})
+        sample_root = root/'full-expansion-manual-review-samples'
+        write(sample_root/(source+'.json'), {'source': source, 'accepted_file_sha256': a['accepted_file_sha256'],
+              'examples': [{'category': 'single', 'training_row': {'task_id': source+'-example'}}]})
+        write(sample_root/(source+'.review.json'), {'source': source, 'status': 'sample_review_passed',
+              'accepted_file_sha256': a['accepted_file_sha256'],
+              'reviewed_examples': [{'task_id': source+'-example', 'category': 'single', 'result': 'pass'}]})
     write(main/'full-generation-report.json', {'status': 'complete', 'manifest': main_manifest,
           'reasons': {'accepted:qwen_semantic': 31, 'wrong_answer': 21448}})
     write(root/'expansion-source-provenance.json', {'status': 'assembled', 'tasks': 21479, 'sources': sources})

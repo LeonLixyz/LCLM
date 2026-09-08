@@ -49,7 +49,57 @@ removed, while retaining its task and final-answer contract.
 Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
 `/data/stage3-build-20260906/validation/` on the data volume.
 
-## Latest checkpoint — 2026-09-08 01:32 EDT — replacement-aware release code tested
+## Latest checkpoint — 2026-09-08 01:55 EDT — FaithDial semantic sample failed; release hold enforced
+
+- Both full generators are still active, unchanged, one task each. Main
+  **ap-NT9cm8Mc78qaGB9euDnK99** ACORD checkpoint **8,300 attempts / 6,521 accepted**;
+  corrective **ap-c9DCBmAQMHHS4aJt9MASov** MultiDoc2Dial **4,300 / 3,162**.
+  Do not redeploy/duplicate either. Eleven main sources remain complete.
+- Prepared deterministic single/multi full-run samples for FaithDial in
+  **ap-kyAX11fOEWMMERvuk2HGrX**, Watsonx in **ap-bfrxSe4CxXyfZ4YjopTClS**.
+  Read task/reference/system/schema/calls, all complete tool observations and
+  final answers. Evidence files are under the existing full manual sample root.
+- **FaithDial is held from release.** Multi sample
+  `rea3-485f8980a759552ce06d42ec` adds an unsupported age/background generalization
+  about OCD, absent from all three expanded bodies, despite BOTH semantic votes
+  accepting it. Required source 4171 contains only one risk-factor sentence;
+  a distractor supplies the OCD definition. Single sample
+  `rea3-5fdc65e84b8db045fbc2fdfe` correctly declines to invent a website's origin
+  or reviews and passes. This is one failed example, not an all-row error rate.
+  Do not discard the finding, silently edit the answer, or infer a source-wide
+  pass from the existing all-row format audit.
+- Both sampled FaithDial relevant passages are one sentence; their 512+ token
+  segments are mostly unrelated RELATED SOURCE snippets. Record this as a
+  short-evidence retrieval task limitation, not genuinely long source documents.
+  Chronological sampled histories lack speaker labels but are not reversed.
+  Follow-up: investigate unsupported extra claims, make a versioned correction/
+  exclusion with exact accounting/provenance, then re-audit and re-review. Keep
+  original generation files intact. Current selection deliberately cannot pass
+  this source until that remediation is explicitly integrated and reviewed.
+- Watsonx two samples **pass**: AI guardrails behavior and OpenScale definition
+  are supported by the supplied pinned docs, including all verbose extra claims.
+  FAQ trace expands five chunks although one contains the full answer. This
+  remains inefficient expansion, not necessary five-hop reasoning. No assertion
+  about today's product behavior is made.
+- Reviews committed under `data/reviews/stage3-full-{faithdial,watsonx_docs_qa}-review.json`
+  and uploaded to `/data/stage3-build-20260906/full-expansion-manual-review-samples/`
+  as `{source}.review.json`. FaithDial status `sample_review_failed`, Watsonx
+  `sample_review_passed`; both remain `approved_for_release: false`.
+- Strengthened shared selection gate: each selected ORIGINAL source now requires
+  a passing manual sample review, bound to the audit's accepted-file SHA and
+  exactly the sampled task IDs/categories. Missing/failed/stale reviews block
+  export and publication. Corrected MultiDoc2Dial retains its separate stricter
+  full-source review gate. Reviews are included in the selection SHA, so changed
+  reviews invalidate prior export/packing/final-review selection bindings.
+- **97 CPU regression tests passed** on Modal **ap-a83S729gEHacBaLIMKbElG**,
+  including six new passing/missing/failed/stale/wrong-ID review cases. No GPU
+  validation, export, packing or HF publication launched this checkpoint.
+  Next safe work: remaining completed-source manual reviews and a bounded
+  FaithDial claim-grounding remediation plan/pilot; wait for existing corrected
+  source full completion before its audit/review. Base source/license/split
+  provenance and final packing/GPU/release gates still remain unresolved.
+
+## Historical checkpoint — 2026-09-08 01:32 EDT — replacement-aware release code tested
 
 - Both full generators remain active with one task each, unchanged:
   main **ap-NT9cm8Mc78qaGB9euDnK99**, corrective
