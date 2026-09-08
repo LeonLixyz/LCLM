@@ -49,7 +49,32 @@ removed, while retaining its task and final-answer contract.
 Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
 `/data/stage3-build-20260906/validation/` on the data volume.
 
-## Latest checkpoint — 2026-09-07 21:52 EDT — resumed generation healthy
+## Latest checkpoint — 2026-09-07 22:23 EDT — generation progressing; base inventory saved
+
+- Generator **ap-NT9cm8Mc78qaGB9euDnK99**, call
+  **fc-01M1ZB04K1DJ94V1PGWTGC9224**, remains active with one GPU container;
+  normal inference logs observed. Do not redeploy or submit another generation
+  call while active. Latest persisted MultiDoc2Dial checkpoint: 2,800 new
+  attempts, **19,302 cumulative / 11,829 accepted**. Including eight completed
+  sources: **80,282 attempts / 37,089 accepted**. MultiDoc2Dial still incomplete.
+- Base inventory app **ap-3VhthOxDUtpOsCRVpJSbq4** stopped after saving
+  `/data/stage3-build-20260906/base-source-provenance-inspection.json` with
+  status `inspected`, approved false. All **2,033 shards / 20,326,114 rows**
+  accounted for across **37 sub_dataset labels**. Every shard has a download
+  receipt pinned to **b1b26053a7cd4ad669dd590c3cb6d14af91d946b**; none missing.
+  HF metadata at that revision has no card, license or notice files. This
+  completes runtime inspection, not attribution/terms clearance. Original
+  upstream source mapping is still required; do not infer IDs from labels.
+- The original base inventory includes **662 pubmedqa_labeled rows**. This is
+  not the separate expansion source (which correctly uses 450 official training
+  IDs). Base rows' official split membership has not been checked; count alone
+  does not prove overlap because duplicates/transformations may exist. Include
+  this question in the original-mixture provenance/split review before release.
+- No new source has finished since the eight completed full-format audits.
+  Remaining work: generation, later-source audits, final semantic/source review,
+  expansion export/packing, final GPU validation and gated publication.
+
+## Historical checkpoint — 2026-09-07 21:52 EDT — resumed generation healthy
 
 - Deployed app **ap-NT9cm8Mc78qaGB9euDnK99**, call
   **fc-01M1ZB04K1DJ94V1PGWTGC9224**, is healthy and generating with one
