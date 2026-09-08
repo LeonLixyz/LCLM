@@ -1,0 +1,39 @@
+{
+  "status": "calibration_failed",
+  "version": "question-conditioned-claims-v1",
+  "reviewed_at": "2026-09-08T10:03:00Z",
+  "input_rows_sha256": "43322d45243b9fb70e1f4a677ced674cb00ee9f903072ed85941917674cb9a62",
+  "input_manifest_sha256": "eeb16a3b90632811da51d249d631be9c1dfa9c20702526dcc3a26121b6c6e36a",
+  "decisions_sha256": "cbb5c41d70f514e40412ce2cb21b9af6a2bdaf8f8cfc1154c10fe2b2a9ba9830",
+  "rows": 88,
+  "kept": 8,
+  "errors": 72,
+  "non_error_rejections": 8,
+  "controls_passed": 0,
+  "controls_total": 8,
+  "approved_for_full_source_review": false,
+  "approved_for_release": false,
+  "training_rows_modified": false,
+  "findings": [
+    {
+      "task_id": "rea3-056c5e1e18febd81c7a339de",
+      "result": "false_accept",
+      "evidence": "MAUD question asks the superior-offer COR standard. The accepted supporting quote explicitly invokes Notice of Intervening Event. Both the claim and whole-answer checks incorrectly accepted the condition mismatch. Schema enforcement alone does not fix this semantic failure."
+    },
+    {
+      "result": "seven_other_controls_parse_errors",
+      "evidence": "All seven remaining controls failed JSON parsing. Error-driven keep=false does not count as a calibrated negative decision. V1 did not persist raw failed completion bodies, so the exact output format is unknown until a separately logged reproduction."
+    },
+    {
+      "task_id": "rea4-md2d-2020f4db6d8e9f8c4e5b42af",
+      "result": "abbreviation_fragmentation",
+      "evidence": "Saved sentence decisions split at U.S. into incomplete fragments, including Social Security office, U.S. and Embassy, or consulate. Whole-answer review avoids this particular segmentation failure without changing the trace."
+    },
+    {
+      "task_id": "rea4-md2d-c4bc282af067bd49691aa9e0",
+      "result": "quote_validation_failure",
+      "evidence": "The reviewer added an apostrophe to source Board s in its quote; conservative quote matching rejected it. Preserve source bytes and record raw outputs rather than silently relaxing semantic quotation checks."
+    }
+  ],
+  "next_scope": "Separate bounded 88-row structured whole-answer diagnostic using the same immutable inputs and eight unchanged controls; save raw requests/responses and reproduce three V1 parse-error controls without constrained decoding. No full-source or release approval."
+}

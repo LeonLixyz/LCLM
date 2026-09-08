@@ -49,7 +49,66 @@ removed, while retaining its task and final-answer contract.
 Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
 `/data/stage3-build-20260906/validation/` on the data volume.
 
-## Latest checkpoint — 2026-09-08 05:30 EDT — question-conditioned diagnostic submitted, 88 rows
+## Latest checkpoint — 2026-09-08 06:04 EDT — V1 calibration failed; separate structured diagnostic submitted
+
+- Main **ap-NT9cm8Mc78qaGB9euDnK99** remains active, unchanged. Persistent
+  ACORD checkpoint at 06:02: **48,700 attempts / 42,165 accepted**. FaithDial/
+  CLAPNQ review **ap-MRs5K5BukSZUvrSm1h2dlv** remains active, unchanged:
+  **4,700 / 8,506 reviewed**, FaithDial 2,768 kept / 1,910 rejected / 22 errors;
+  CLAPNQ not started. These are partial decisions, not released data. Neither
+  deployment was changed or duplicated. Corrected MD is complete; do not rerun.
+- Question V1 **ap-eXdiwJYWWrjl0lZsRFoBKP** finished and is idle: **88 reviewed,
+  8 kept / 72 JSON parse errors / 8 non-error rejections**. **Zero of eight
+  controls passed**: MAUD negative `rea3-056c5e1e18febd81c7a339de` was incorrectly
+  kept despite its superior-offer/intervening-event scope mismatch; seven other
+  controls had parse errors. Error-driven rejection is not calibration success.
+  Decisions SHA **cbb5c41d70f514e40412ce2cb21b9af6a2bdaf8f8cfc1154c10fe2b2a9ba9830**.
+  Read all saved decisions. V1 did not save failed completion bodies, so their
+  actual formatting remains unknown. Do not claim code fences were the cause.
+- Saved failure review **data/reviews/stage3-question-grounding-v1-review.json**,
+  uploaded as **question-grounding-claims-v1/manual-review.json**, with no scale
+  or release approval. Additional diagnosed false rejection: naive sentence
+  splitting fragments `U.S.`; some judge quotations also add absent apostrophes.
+  Original traces and all existing source holds remain unchanged.
+- Added separate **data/question_grounding_structured.py**, protocol
+  **question-conditioned-structured-whole-answer-v2**, SHA
+  **92ab013576873781eb1cf7e19e788fc1fd45ab4fce75d52a9f5b65e5ef7034e1**.
+  Reviews whole answers with seven typed checks (scope, period, order,
+  value/unit/sign, boundary, all claims, completeness), constrained JSON schema,
+  exact/conservative quote validation and explicit separation of task-output
+  instructions from review instructions. A valid JSON object is not evidence
+  of semantic correctness. No control-specific answer override is present.
+- **164 regression tests passed** on CPU **ap-VELcuJ1SpIG41awmYoyMBa**,
+  including 19 new structured-protocol tests. Same immutable **88 inputs and
+  eight unchanged controls**; maximum **3,627 prompt tokens + 2,048 output**
+  fits pinned 32,768 context. Preflight rehashed source bytes, old decisions,
+  input manifest and five protocol/runner files. Original V1 protocol unchanged.
+- Deployed **lclm-question-grounding-structured-v2**, verified zero tasks, then
+  submitted once: **ap-NMte2RHDyj8JCPCviSTwbf**, call
+  **fc-01M207J7F2AFQPQDA68ZCDVDNM**. Module
+  **data.run_question_structured_calibration_modal::pilot**, H200:8, max one
+  container, two-hour cap, concurrency eight, pinned Qwen235B-Instruct with
+  thinking disabled. Saves full judge requests/responses separately with each
+  decision bound to its raw-response SHA. Includes three unconstrained V1
+  reproductions, selected deterministically from failed controls, to inspect
+  actual response formatting. These are diagnostics only, never training rows.
+- Output **/data/stage3-build-20260906/question-grounding-structured-v2/**:
+  `preflight.json`, `manifest.json`, `decisions.jsonl`, `raw-responses/`,
+  `v1-probe-<task_id>.json`, final `report.json`. Submission confirmed;
+  startup/results need checking. Do not redeploy or duplicate while active.
+  Local entrypoint performs CPU preflight only. No full-source/filter/release
+  path exists. V1 artifacts and active FaithDial/CLAPNQ protocol are preserved.
+- **Next:** inspect all eight control outcomes and raw V1 probes; manually
+  review fresh kept/rejected non-controls, especially MD. Any failed control
+  blocks scale; passing controls alone is not approval. If reviewer remains
+  unreliable, preserve diagnostics and reassess instead of repeatedly scaling
+  an uncalibrated heuristic. Await FaithDial/CLAPNQ completion, then inspect
+  decisions before retained-subset materialization and explicit exclusion
+  accounting. MAUD/TAT-QA/corrected MD still held. Base provenance/terms remain
+  unresolved and block HF publication. Expansion packing/export and final
+  all-component packed-data GPU integration remain undone; no final HF release.
+
+## Historical checkpoint — 2026-09-08 05:30 EDT — question-conditioned diagnostic submitted, 88 rows
 
 - Confirmed main **ap-NT9cm8Mc78qaGB9euDnK99** active, unchanged: ACORD last
   checked at 05:21, **42,300 attempts / 36,487 accepted**. Corrected MD deployment
