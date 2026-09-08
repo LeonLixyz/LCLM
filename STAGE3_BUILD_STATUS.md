@@ -56,9 +56,12 @@ Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
   **18,357 attempts / 7,884 accepted**; Watsonx **45 / 31**. Main V6 has
   **11 completed sources / 100,833 attempts / 46,443 accepted**, including the
   old, release-held MultiDoc2Dial. ACORD is next, then BillSum, LexGLUE, synthetic.
-- Full FaithDial + Watsonx format/label audits launched in
-  **ap-iC0Wavg14heFJIGUZ9pxgg**; await their reports in the standard
-  `/data/stage3-build-20260906/full-expansion-format-audit/` directory.
+- Full FaithDial + Watsonx format/label audits **passed** in
+  **ap-iC0Wavg14heFJIGUZ9pxgg**: every **7,884 + 31 accepted rows**, zero
+  failures, 8,145 + 73 calls, 100 + 12 multi-expansion rows, minima 723/705
+  tokens. Reports in `/data/stage3-build-20260906/full-expansion-format-audit/`.
+  All 11 completed V6 sources are format-audited (**46,443 rows**); that does
+  not lift the old MultiDoc2Dial semantic/prompt release hold.
 - Corrective MultiDoc2Dial pilot finished **32 attempts / 21 accepted**. Pilot
   GPU app **ap-BWrkXeukNZoYoArprKQaOe** has zero tasks and no active GPU.
   Audit **ap-yjB4XRhN52F6JEdmyXgc7V** passed all 21, 35 calls, 10 multi-expansion
@@ -77,7 +80,8 @@ Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
   **Do not duplicate or redeploy either active full generator.**
   Output: `/data/stage3-agent/real-expansion/pilots/multidoc2dial-chronological-v1-full`.
   Same Qwen235B/no-thinking and verification settings, 24-hour bound, 21,451
-  corrected tasks. Startup/progress needs confirmation. These will replace old
+  corrected tasks. Weight loading observed; inference progress still needs
+  confirmation. These will replace old
   V6 MultiDoc2Dial at release time; never concatenate both versions.
 - **37 regression tests passed** in **ap-b2w5pCuppN42jTAcBXh1jv**, including
   rejected missing/stale approvals, changed teacher, hashes and review IDs.
