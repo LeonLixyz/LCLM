@@ -28,6 +28,11 @@ EXPECTED_SHA = "ed8c72b55cd790cdc009b60e59088174ba8dfd35fb9f4d76d594379e1b005649
               volumes={"/data": data_volume, CACHE_ROOT: hf_cache_volume},
               secrets=[modal.Secret.from_name("huggingface")])
 def pilot():
+    return run_corrective(32, OUTPUTS)
+
+
+def run_corrective(pilot_limit, output_root):
+    """Shared server path; full-run callers must apply the reviewed-pilot gate."""
     import subprocess
     from openai import OpenAI
     from data.full_expansion_rollouts import generate_all
@@ -71,8 +76,8 @@ def pilot():
         client = OpenAI(api_key="not-needed", base_url="http://127.0.0.1:8000/v1",
                         timeout=300, max_retries=2)
         return generate_all(client, SERVED_MODEL_NAME, MODEL_REVISION, INPUTS,
-                            data_volume.commit, data_volume.reload, output_root=OUTPUTS,
-                            sources=["multidoc2dial"], pilot_limit=32, strict_semantics=True,
+                            data_volume.commit, data_volume.reload, output_root=output_root,
+                            sources=["multidoc2dial"], pilot_limit=pilot_limit, strict_semantics=True,
                             input_provenance=provenance)
     finally:
         process.terminate()

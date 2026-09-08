@@ -49,7 +49,43 @@ removed, while retaining its task and final-answer contract.
 Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
 `/data/stage3-build-20260906/validation/` on the data volume.
 
-## Latest checkpoint — 2026-09-08 00:29 EDT — corrective pilot submitted; regressions passed
+## Latest checkpoint — 2026-09-08 00:58 EDT — 11 main sources complete; corrected source submitted
+
+- Main generator **ap-NT9cm8Mc78qaGB9euDnK99**, call
+  **fc-01M1ZB04K1DJ94V1PGWTGC9224**, remains active. FaithDial completed:
+  **18,357 attempts / 7,884 accepted**; Watsonx **45 / 31**. Main V6 has
+  **11 completed sources / 100,833 attempts / 46,443 accepted**, including the
+  old, release-held MultiDoc2Dial. ACORD is next, then BillSum, LexGLUE, synthetic.
+- Full FaithDial + Watsonx format/label audits launched in
+  **ap-iC0Wavg14heFJIGUZ9pxgg**; await their reports in the standard
+  `/data/stage3-build-20260906/full-expansion-format-audit/` directory.
+- Corrective MultiDoc2Dial pilot finished **32 attempts / 21 accepted**. Pilot
+  GPU app **ap-BWrkXeukNZoYoArprKQaOe** has zero tasks and no active GPU.
+  Audit **ap-yjB4XRhN52F6JEdmyXgc7V** passed all 21, 35 calls, 10 multi-expansion
+  rows, minimum 606 Qwen tokens. Manifest SHA
+  **962334d2a79e0b6c5e629ab1c0f983f4adac86c61ef8038cb17576746bb910c1**;
+  accepted SHA **3791c9a1aa5bc57fcdcdfe3e09115012e5e9c004cc63a0674fe56d2fb90fe6b6**.
+- Sample app **ap-FpsSpy1OmrVUtJyLCLdnjB** finished. Reviewed full evidence for
+  one single and one multi-expansion corrected pilot trace. Current-request
+  boundaries are clear and answer claims grounded in the expanded documents.
+  Recorded internal **approval to scale only**, not release approval, in
+  `data/reviews/stage3-md2d-corrective-pilot-review.json`, uploaded to the pilot's
+  `review-passed.json`. Twenty-one pilot rows are not added to main-run counts.
+- New corrected full app **ap-c9DCBmAQMHHS4aJt9MASov**
+  (`lclm-md2d-corrective-full-v1`), call **fc-01M1ZP01R08PH9PAA822K4PWX9**,
+  submitted after explicit hash-bound pilot/audit/manual-review checks.
+  **Do not duplicate or redeploy either active full generator.**
+  Output: `/data/stage3-agent/real-expansion/pilots/multidoc2dial-chronological-v1-full`.
+  Same Qwen235B/no-thinking and verification settings, 24-hour bound, 21,451
+  corrected tasks. Startup/progress needs confirmation. These will replace old
+  V6 MultiDoc2Dial at release time; never concatenate both versions.
+- **37 regression tests passed** in **ap-b2w5pCuppN42jTAcBXh1jv**, including
+  rejected missing/stale approvals, changed teacher, hashes and review IDs.
+  Added shared corrective serving helper and gated full-generation module;
+  active main deployment was not changed. Final source replacement/export/
+  provenance integration remains to be implemented after full repair validation.
+
+## Historical checkpoint — 2026-09-08 00:29 EDT — corrective pilot submitted; regressions passed
 
 - Main generator **ap-NT9cm8Mc78qaGB9euDnK99**, call
   **fc-01M1ZB04K1DJ94V1PGWTGC9224**, remains active and unchanged. Latest
