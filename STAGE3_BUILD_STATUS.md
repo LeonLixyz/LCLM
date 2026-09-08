@@ -51,10 +51,10 @@ Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
 
 ## Latest checkpoint — 2026-09-08 08:25 EDT — contiguous quotation diagnostic tested
 
-- **09:22 EDT monitoring check:** same main app remains active with one task.
-  BillSum **2,400 attempts / 106 accepted**, with **1,830 semantic rejects,
-  443 JSONDecodeError, 8 missing support, 10 ValueError, 2 unknown segments,
-  1 invalid segment ID**. Latest saved progress at 09:18; no completed BillSum,
+- **09:52 EDT monitoring check:** same main app remains active with one task.
+  BillSum **3,000 attempts / 129 accepted**, with **2,272 semantic rejects,
+  576 JSONDecodeError, 10 missing support, 10 ValueError, 2 unknown segments,
+  1 invalid segment ID**. Latest saved progress at 09:51; no completed BillSum,
   LexGLUE or synthetic generation report yet. No job or gate changed, no new
   inference launched. Existing checkpoints continue advancing normally.
 - Main **ap-NT9cm8Mc78qaGB9euDnK99** remains deployed, one active task.
