@@ -27,10 +27,21 @@ def pack_partition(partition:int,total:int=64,kind:str='base'):
     output=ROOT/f'packed-{kind}-cs16-32768'/f'part-{partition:03d}'
     output.mkdir(parents=True,exist_ok=True)
     complete=output/'report.json'
-    if complete.exists():return json.loads(complete.read_text())
     source=Path('/data/stage3-final-mixture-cot50-v1') if kind=='base' else ROOT/f'{kind}-transport'
     if kind!='base' and not (source/'report.json').exists():
         raise RuntimeError(f'Input export has not completed: {kind}')
+    selection_sha=None
+    if kind=='expansion':
+        from data.expansion_release_selection import selection_digest
+        transport=json.loads((source/'report.json').read_text())
+        selection_sha=selection_digest(transport['expansion_selection'])
+        if selection_sha!=transport.get('expansion_selection_sha256'):
+            raise ValueError('Invalid expansion selection digest')
+    if complete.exists():
+        existing=json.loads(complete.read_text())
+        if kind=='expansion' and existing.get('expansion_selection_sha256')!=selection_sha:
+            raise ValueError('Existing expansion partition has stale source selection')
+        return existing
     files=sorted(source.glob('*.parquet'))
     if not files:raise RuntimeError('Missing completed input data')
     selected=files[partition::total]
@@ -83,6 +94,7 @@ def pack_partition(partition:int,total:int=64,kind:str='base'):
         'decoder_tokenizer_revision':DECODER_REVISION,'encoder_tokenizer_revision':ENCODER_REVISION,
         'base_prefix_recovery_separate':kind=='base',
         'format':'dynamic packed: decoder pretokenized; encoder memory strings tokenized at runtime'}
+    if kind=='expansion':report['expansion_selection_sha256']=selection_sha
     complete.write_text(json.dumps(report,indent=2));volume.commit()
     return report
 

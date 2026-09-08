@@ -13,7 +13,7 @@ PACKED_REPO=RAW_REPO+'-packed-cs16-32k'
 def publish():
     import hashlib
     from huggingface_hub import HfApi
-    from data.stage3_release_checks import validate_base_recovery,validate_expansion_completion,validate_final_artifact_audit,validate_expansion_format_audits
+    from data.stage3_release_checks import validate_base_recovery,validate_final_artifact_audit
     reports={}
     for kind in ('base','agents','expansion'):
         root=ROOT/f'packed-{kind}-cs16-32768'
@@ -41,23 +41,19 @@ def publish():
     for kind,transport in [('agents',native),('expansion',expansion)]:
         if sum(r['counts']['input_rows'] for r in reports[kind])!=transport['rows']:
             raise RuntimeError(f'Raw/packed input-count mismatch: {kind}')
-    generation_root=Path('/data/stage3-agent/real-expansion/pilots/full-20260906-v6')
-    generation=json.loads((generation_root/'full-generation-report.json').read_text())
-    if generation['status']!='complete':raise RuntimeError('Generation incomplete')
-    if generation['manifest'].get('pubmedqa_split',{}).get('train_rows')!=450:
-        raise RuntimeError('Expansion source split provenance is stale')
-    provenance=json.loads((ROOT/'expansion-source-provenance.json').read_text())
-    source_reports=[json.loads((generation_root/(r['source']+'.generation.json')).read_text()) for r in provenance['sources']]
-    generation_counts=validate_expansion_completion(generation,source_reports,provenance)
-    validate_expansion_format_audits(expansion.get('format_audits',[]),source_reports,
-        hashlib.sha256((generation_root/'generation-manifest.json').read_bytes()).hexdigest())
-    if expansion['rows']!=generation_counts['accepted']:
-        raise RuntimeError('Expansion generation/export count mismatch')
+    from data.expansion_release_selection import load_selection,validate_transport_selection,verify_selected_files
+    selected=load_selection(ROOT)
+    validate_transport_selection(expansion,selected)
+    provenance=selected['provenance'];generation_counts=selected['counts']
+    if any(r.get('expansion_selection_sha256')!=selected['selection_sha256'] for r in reports['expansion']):
+        raise RuntimeError('Expansion packing used a different source selection')
     # Source split/license and generated-data review must be recorded explicitly.
     review_path=ROOT/'release-review.json'
     if not review_path.exists() or json.loads(review_path.read_text()).get('approved') is not True:
         raise RuntimeError('Missing final source/trajectory/packed-data review')
     review=json.loads(review_path.read_text())
+    if review.get('expansion_selection_sha256')!=selected['selection_sha256']:
+        raise RuntimeError('Final review is stale for the selected expansion sources')
     notices_root=ROOT/'source-notices-v1'
     notices_bytes=(notices_root/'index.json').read_bytes()
     notices=json.loads(notices_bytes)
@@ -69,6 +65,7 @@ def publish():
     expected_notices.update({('agents',r['repo'].replace('/','--')):(r['repo'],r['revision'])
         for r in json.loads((ROOT/'agent-source-manifest.json').read_text())})
     validate_notice_bundle(notices_root,notices,expected_notices)
+    verify_selected_files(selected)
     api=HfApi()
     for repo in (RAW_REPO,PACKED_REPO):api.create_repo(repo,repo_type='dataset',exist_ok=True)
     for repo in (RAW_REPO,PACKED_REPO):
@@ -95,6 +92,8 @@ def publish():
         'base_combined_counts':base_counts,
         'expansion_generation_counts':generation_counts,
         'expansion_format_audits':expansion['format_audits'],
+        'expansion_selection':selected['selection'],
+        'expansion_selection_sha256':selected['selection_sha256'],
         'source_notices_index_sha256':hashlib.sha256(notices_bytes).hexdigest(),
         'expansion_source_provenance':provenance,
         'source_revisions':json.loads((ROOT/'agent-source-manifest.json').read_text()),

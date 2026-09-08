@@ -9,12 +9,15 @@ def validate_expansion_format_audits(audits, source_reports, manifest_sha256):
     if (not expected or len(expected) != len(source_reports) or len(actual) != len(audits)
             or set(actual) != set(expected)):
         raise ValueError('Full expansion format audit source coverage mismatch')
+    manifests = manifest_sha256 if isinstance(manifest_sha256, dict) else dict.fromkeys(expected, manifest_sha256)
+    if set(manifests) != set(expected):
+        raise ValueError('Expansion manifest source coverage mismatch')
     for source, count in expected.items():
         r = actual[source]
         if (r.get('status') != 'passed' or r.get('rows') != count
                 or r.get('expected_accepted') != count or r.get('counts',{}).get('accepted') != count
                 or r.get('failed_rows') != 0 or r.get('errors') != []
-                or r.get('generation_manifest_file_sha256') != manifest_sha256
+                or r.get('generation_manifest_file_sha256') != manifests[source]
                 or r.get('decoder_tokenizer_revision') != DECODER_REVISION
                 or r.get('encoder_tokenizer_revision') != ENCODER_REVISION
                 or not re.fullmatch(r'[0-9a-f]{64}',r.get('accepted_file_sha256',''))

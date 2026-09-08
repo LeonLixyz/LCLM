@@ -49,7 +49,44 @@ removed, while retaining its task and final-answer contract.
 Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
 `/data/stage3-build-20260906/validation/` on the data volume.
 
-## Latest checkpoint — 2026-09-08 00:58 EDT — 11 main sources complete; corrected source submitted
+## Latest checkpoint — 2026-09-08 01:32 EDT — replacement-aware release code tested
+
+- Both full generators remain active with one task each, unchanged:
+  main **ap-NT9cm8Mc78qaGB9euDnK99**, corrective
+  **ap-c9DCBmAQMHHS4aJt9MASov**. Do not duplicate or redeploy them.
+  Inspected ACORD checkpoint **4,400 attempted / 3,490 accepted**; corrected
+  MultiDoc2Dial **1,900 / 1,376**. Corrective inference is confirmed healthy.
+  Main still has 11 completed sources; these are partial checkpoints, not
+  release-approved totals. Old and corrected MultiDoc2Dial are never additive.
+- Added `data/expansion_release_selection.py`, shared by export and publication.
+  It requires the completed 15-source main run AND completed corrected full
+  run, exact corrected input/parent/source/teacher provenance, its all-row audit,
+  and a separate hash-bound **full-source** `release-review.json` with
+  `approved_for_release: true`. Pilot approval cannot satisfy this gate.
+  That review has **not** been granted or written.
+- Selection takes 14 original sources and exactly one corrected MultiDoc2Dial,
+  preserving old V6 files/reports as diagnostics. Selected counts are recomputed;
+  per-source manifest/file hashes, correction review and original main counts
+  remain in the release manifest. Export rejects duplicate task IDs; publication
+  rehashes selected native JSONL before upload.
+- Export, every expansion packing partition, and final release review now bind
+  the same selection SHA. Stale existing exports/partitions fail closed. No export,
+  packing, publication or new GPU generation was launched by this checkpoint.
+- **91 regression tests passed** on Modal **ap-TmpQzg1Qft4frlE4qmfG9i**
+  (earlier iteration 89 passed in **ap-LaWYJUTuQzlLPtKvFavD1L**). Includes real
+  loader replacement accounting, pilot/missing/stale review rejection, input and
+  parent hashes, per-source manifest mismatch, duplicate IDs, additive transport,
+  changed upload bytes and release-entrypoint syntax. This is CPU release-logic
+  validation, not final packed-data/GPU validation.
+- Next: continue completed-source audits/manual sampling while generation runs;
+  once the corrected full source finishes, run its own full audit and manual
+  review under its versioned directory, then record a reviewed full-source
+  `release-review.json` there. Once all main sources finish and selection gates
+  pass, export/pack expansion, run final actual-expansion GPU validation, and
+  record the selection SHA in the final build review. Original base-mixture
+  source/terms/split provenance still blocks public release. No HF release yet.
+
+## Historical checkpoint — 2026-09-08 00:58 EDT — 11 main sources complete; corrected source submitted
 
 - Main generator **ap-NT9cm8Mc78qaGB9euDnK99**, call
   **fc-01M1ZB04K1DJ94V1PGWTGC9224**, remains active. FaithDial completed:
