@@ -49,10 +49,41 @@ removed, while retaining its task and final-answer contract.
 Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
 `/data/stage3-build-20260906/validation/` on the data volume.
 
-## Latest checkpoint — 2026-09-07 17:10 EDT — awaiting cancellation clarification
+## Latest checkpoint — 2026-09-07 21:44 EDT — full generation submitted
 
-- **The resumed GPU app stopped again. Do not automatically restart it until
-  the user clarifies whether these cancellations were intentional.** App
+- User explicitly requested generation of all tasks; the previous cancellation
+  hold is lifted. No other LCLM app was listed before starting checkpoint audit
+  `ap-QlOC44rwUt72Yqn0Y6Rq8i`. Its report passed at 01:44:03 UTC:
+  **77,482 persisted attempts / 35,201 accepted**, including MultiDoc2Dial's
+  **16,502 attempts / 9,941 accepted**. No duplicate IDs, partial JSONL lines,
+  unknown task IDs or completed-report mismatches. Remaining: **297,273 tasks**.
+- User suggested Qwen/Qwen3.8-2.4T-A95B and requested no thinking. Its official
+  model card says thinking cannot be disabled; Modal lists a shared endpoint
+  with the same restriction. Asked whether no thinking means generation itself
+  or just the saved training traces. Default remains the approved, non-thinking
+  Qwen3-235B-Instruct teacher; do not silently switch the V6 manifest/model.
+- Qwen3.8 evidence: https://huggingface.co/Qwen/Qwen3.8-2.4T-A95B#api-usage
+  and https://modal.com/library/qwen/qwen3-8-max . No Qwen3.8 endpoint created.
+- Deployed existing 235B generator as app **ap-NT9cm8Mc78qaGB9euDnK99** and
+  submitted **fc-01M1ZB04K1DJ94V1PGWTGC9224** using
+  `python -m data.submit_expansion_generation`. The submitter exited normally;
+  no local process is waiting on the remote function. Check this call/app before
+  doing anything; **do not submit another job while this one is pending/running**.
+  This removes the local waiting process from the job lifecycle; it does not
+  establish the cause of the earlier cancellations. GPU startup not yet verified.
+- Generation still uses the exact approved V6 manifest, Qwen235B revision and
+  non-thinking requests. All saved attempted IDs are skipped. Same checkpoint
+  paths, 24-hour function timeout and existing semantic/format gates apply.
+  No public unauthenticated endpoint was created; this is a Modal class service.
+- Launcher syntax-compiled locally; image deployment and job submission passed.
+  Generator logic was not changed; recursive bytecode image exclusions added.
+- Base provenance/terms and final release gates remain unresolved. No new HF
+  release exists. Generation target remains 374,755 tasks, not accepted rows.
+
+## Historical checkpoint — 2026-09-07 17:10 EDT — awaiting cancellation clarification
+
+- **The resumed GPU app stopped again. The restart hold recorded here was
+  lifted by the user's resume request above.** App
   `ap-UXSWSfrR3pbU6soJrhFl1B` received an input cancellation signal at
   **19:52:20 UTC / 15:52 EDT**, then stopped at 15:53:28 EDT. It was processing
   requests normally immediately beforehand. No inference-error cause appears

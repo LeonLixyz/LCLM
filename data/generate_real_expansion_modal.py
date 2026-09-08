@@ -1,5 +1,13 @@
 #!/usr/bin/env python3
-"""Generate verified native-expansion trajectories for real-source pilot tasks."""
+"""Generate verified native-expansion trajectories for real-source pilot tasks.
+
+For durable full generation, first checkpoint-audit the saved files, then:
+    modal deploy -m data.generate_real_expansion_modal
+    python -m data.submit_expansion_generation
+
+The submitter only queues a job on the deployed app, without waiting locally.
+Inspect existing app/call status before submitting; do not queue duplicate jobs.
+"""
 
 from __future__ import annotations
 
@@ -35,7 +43,8 @@ image = (
         ".",
         str(PROJECT_ROOT),
         copy=True,
-        ignore=[".git", ".venv", "__pycache__", "*.pyc", "_modal_run"],
+        ignore=[".git", ".venv", "__pycache__", "*.pyc",
+                "**/__pycache__/**", "**/*.pyc", "_modal_run"],
     )
     .env(
         {
