@@ -1,0 +1,17 @@
+{
+  "source": "pubmedqa_labeled",
+  "status": "sample_review_passed",
+  "approved_for_release": false,
+  "scope": "One deterministic full-run sample: all 233 accepted rows are single-expansion, so no multi bucket exists. Not an all-row semantic guarantee or final release approval.",
+  "accepted_file_sha256": "16d3f5f5d70d7805258589f49f27888cac6cadeaf3baec20e662c3ff1c77c7b4",
+  "sample_artifact": "/data/stage3-build-20260906/full-expansion-manual-review-samples/pubmedqa_labeled.json",
+  "reviewed_examples": [
+    {
+      "task_id": "rea3-8e26c2bdaf23db073c3afa14",
+      "category": "single",
+      "result": "pass",
+      "evidence": "The primary Chingford Study abstract describes 594 women followed across 14 years; greater BMI and BMI change predict later knee pain, with BMI-change association independent of radiographic OA. The concise yes answer matches the task and supplied results without adding unsupported clinical guidance. Unrelated appended abstracts are not used."
+    }
+  ],
+  "trajectory_checks": "Read task/reference, saved system and native expand schema/call, the complete tool observation and final answer. The source-wide audit separately checked every accepted task against the official train IDs and validated memory/labels. This is source-text grounding review, not medical advice or an independent evaluation of the study."
+}

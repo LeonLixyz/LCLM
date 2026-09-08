@@ -49,7 +49,59 @@ removed, while retaining its task and final-answer contract.
 Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
 `/data/stage3-build-20260906/validation/` on the data volume.
 
-## Latest checkpoint — 2026-09-08 01:55 EDT — FaithDial semantic sample failed; release hold enforced
+## Latest checkpoint — 2026-09-08 02:26 EDT — CLAPNQ held; 58-row grounding calibration prepared
+
+- Both full generators remain active and unchanged, one task each. Main
+  **ap-NT9cm8Mc78qaGB9euDnK99** ACORD checkpoint **13,200 attempts / 10,774 accepted**;
+  corrected **ap-c9DCBmAQMHHS4aJt9MASov** MultiDoc2Dial **6,900 / 4,964**.
+  Eleven main sources remain complete. Do not duplicate/redeploy either job.
+- PubMedQA sample app **ap-75YNh0uET3KwsK7KrWwwSY** completed. Its source-wide
+  audit has 233 calls for 233 accepted rows, no multi-expansion bucket. Reviewed
+  the sole hash-selected single sample `rea3-8e26c2bdaf23db073c3afa14`: the
+  Chingford abstract supports the concise yes answer; no invented clinical
+  details. Recorded **sample pass**, not final release approval. Official
+  train-only source-wide audit remains valid; base-mixture PubMed split status
+  is a separate unresolved provenance issue.
+- CLAPNQ sample app **ap-wgPgWlPvd7jzYhYOWcpUdt** completed. Multi sample
+  `rea3-37018cffcd551f8a937b73c9` **fails**: a flattened state-law table loses
+  Indiana column boundaries, yet answer asserts distinct adult/handheld/texting/
+  hands-free rules. The supplied text does not unambiguously establish them;
+  both automatic votes passed anyway. This review makes no claim about current
+  Indiana law. Single `rea3-af40e67daccef4fc895e2a3a` (Little Lion Man meaning)
+  is grounded and passes. Read all complete tool bodies and full task/answers.
+  **CLAPNQ joins FaithDial on release hold**, enforced by the manual-review gate.
+  Investigate original table structure if available, otherwise reject ambiguous
+  table answers with explicit versioned exclusions; do not import current facts.
+- Both reviews are in `data/reviews/stage3-full-{pubmedqa_labeled,clapnq}-review.json`
+  and uploaded to the matching `{source}.review.json` on the manual sample volume
+  path. All remain `approved_for_release: false`.
+- Added CPU-only `data.prepare_grounding_calibration_modal`; ran successfully in
+  **ap-4WQZ6jJBXAkq66PiSuFD4w**. Rehashed/scanned every **7,884 FaithDial + 622
+  CLAPNQ accepted rows**, checked duplicates/accepted flags/review hashes. Saved
+  **58 diagnostic candidates: 34 FaithDial + 24 CLAPNQ**, using up to 16 per
+  single/multi source bucket plus all four manually checked positive/negative
+  controls. CLAPNQ has only seven multi-expansion rows, all included.
+  Output `/data/stage3-build-20260906/grounding-calibration-v1/`:
+  `candidates.jsonl`, `manifest.json`; row file SHA
+  **f1caf75d1e4716aaa8cb49c710b13cd1fa15726fdf6103405dbc4ae3dc0a2eac**.
+  Original training rows retained byte-for-byte; original outputs not changed.
+  Control expectations are separate metadata, forbidden in judge/training inputs.
+- Calibration is **prepared, not judged or approved**; no extra GPU was started.
+  Next implement a bounded pinned-Qwen235B/no-thinking per-claim evidence-quote
+  diagnostic, then manually inspect control decisions and sampled keep/reject
+  cases before scaling any source re-review. Existing BillSum claim checker is
+  a starting point, but cannot be reused blindly: FaithDial includes legitimate
+  abstention/missing-information answers, which lack positive evidence quotes.
+  Handle abstention explicitly without admitting unsupported positive claims.
+  Verbatim quote presence is mechanically checkable; entailment is still a
+  same-model heuristic. Calibration must catch BOTH known failures before scale.
+- No runtime training/packing code changed; previous 97 regression tests remain
+  the latest suite. New preparer validated through its successful all-input CPU
+  run. No HF release. Remaining completed-source manual reviews, corrected full
+  source audit/review, source remediation, final packing/GPU and base provenance
+  gates still need completion.
+
+## Historical checkpoint — 2026-09-08 01:55 EDT — FaithDial semantic sample failed; release hold enforced
 
 - Both full generators are still active, unchanged, one task each. Main
   **ap-NT9cm8Mc78qaGB9euDnK99** ACORD checkpoint **8,300 attempts / 6,521 accepted**;
