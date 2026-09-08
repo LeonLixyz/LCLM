@@ -49,7 +49,48 @@ removed, while retaining its task and final-answer contract.
 Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
 `/data/stage3-build-20260906/validation/` on the data volume.
 
-## Latest checkpoint — 2026-09-08 06:28 EDT — structured diagnostic failed semantic controls; no new GPU retry
+## Latest checkpoint — 2026-09-08 06:55 EDT — completed-review inspector ready; active jobs unchanged
+
+- At 06:51, main **ap-NT9cm8Mc78qaGB9euDnK99** remains active: ACORD
+  **56,200 attempts / 48,802 accepted**, approaching 58,529 planned tasks.
+  FaithDial/CLAPNQ **ap-MRs5K5BukSZUvrSm1h2dlv** remains active:
+  **7,550 / 8,506 reviewed**, FaithDial 4,430 kept / 3,084 rejected / 36 errors;
+  CLAPNQ not reached at that checkpoint. Final review report did not yet exist.
+  No active deployment/protocol changed; no new GPU inference was launched.
+- Added **data/grounding_decision_replay.py**, mechanically replaying saved V3
+  votes through the existing protocol without model requests. It verifies ID,
+  sentence coverage/order, exact saved/replayed fields, quote checks and final
+  decision consistency. Error rows remain separately quarantined, not treated
+  as reviewed semantic rejects. This does not establish factual correctness.
+- Added **data/inspect_full_grounding_review_modal.py**, CPU-only inspector.
+  It requires final `full-grounding-review-v3/report.json`, reloads and validates
+  the hash-bound calibrated job/input manifests, checks all decision/source IDs,
+  replays non-error decisions, audits original accepted+rejected generation
+  ledgers against every prepared task, and computes candidate partition counts/
+  hashes in memory. No training subset is written or selected for publication.
+- The inspector selects fresh examples by lowest
+  `SHA256(full-grounding-inspection-v1:task_id)` per source/outcome/single-multi
+  bucket, excluding all 58 calibration IDs. Full rows and separate untruncated
+  primary-evidence views will be saved under
+  **/data/stage3-build-20260906/full-grounding-review-v3-inspection-v1/** as
+  `report.json`, `samples.json`, `primary-evidence.json`. All approvals false.
+  Existing different inspection bytes cause a failure rather than overwrite.
+- **238 regression tests passed** on Modal CPU **ap-Y8jys4jRDdQoAvNatXgaaT**,
+  including 12 new replay tests and the real 58-row calibration preflight.
+  Inspector smoke run **ap-CUMgl4ezNvXKfDghyTR8lk** correctly returned
+  `waiting_for_complete_review` at 06:55, without reading partial decisions or
+  writing inspection artifacts. Its full-data path has not run yet.
+- **Next:** when the existing full review completes, run
+  `modal run -m data.inspect_full_grounding_review_modal`, inspect all fresh
+  kept/rejected/error samples, then decide whether retained candidates merit
+  separate materialization and fresh format/manual review. No partial subsets.
+  When ACORD completes, run its all-row format audit and manual sampler without
+  interrupting main generation, which should proceed to BillSum/LexGLUE/synthetic.
+  MAUD/TAT-QA/corrected MD holds and failed structured calibration are unchanged;
+  do not scale that reviewer. Base provenance/terms remain unresolved. No final
+  raw/packed HF release, expansion packing/export or final all-component GPU test.
+
+## Historical checkpoint — 2026-09-08 06:28 EDT — structured diagnostic failed semantic controls; no new GPU retry
 
 - Main **ap-NT9cm8Mc78qaGB9euDnK99** remains active, unchanged: ACORD at 06:21
   **51,700 attempts / 44,736 accepted**. FaithDial/CLAPNQ full review
