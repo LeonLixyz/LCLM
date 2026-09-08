@@ -37,6 +37,8 @@ def test_quotes_are_scoped_to_exact_primary_segment(quote, segment, keep):
 @pytest.mark.parametrize('sentence,keep', [
     ('The date is not provided.', True), ('I cannot answer the requested date.', True),
     ('The provided context does not include its date and reviews.', True),
+    ('The source does not specify the color of the apple.', True),
+    ('The source does not specify the color, but it is red.', False),
     ('It applies to everyone.', False), ('I cannot tell, but it applies to everyone.', False),
     ('The date is not available and it applies to everyone.', False)])
 def test_abstention_cannot_be_generic_quote_bypass(sentence, keep):
@@ -102,3 +104,9 @@ def test_normalization_preserves_semantically_meaningful_characters(source, quot
 def test_inconsistent_fit_reason_fails_closed():
     answers = iter([json.dumps(vote()), '{"correct":true,"grounded":true,"issue":"unsupported_claim"}'])
     with pytest.raises(ValueError): review_claims(row(), lambda _: next(answers))
+
+
+def test_date_typo_in_judge_quote_is_not_auto_repaired():
+    result = validate_sentence_vote('Pickups were filmed in 1998.', {'seg_1': 'Pickups were filmed in 1998.'},
+        vote(evidence_quotes=[{'segment_id': 'seg_1', 'quote': 'Pickups were filmed in 1988.'}]))
+    assert result['keep'] is False

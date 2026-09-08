@@ -49,7 +49,58 @@ removed, while retaining its task and final-answer contract.
 Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
 `/data/stage3-build-20260906/validation/` on the data volume.
 
-## Latest checkpoint — 2026-09-08 03:27 EDT — diagnostic v1 failed calibration; v2 submitted
+## Latest checkpoint — 2026-09-08 03:58 EDT — V2 controls passed; extra manual review and V3 guard fix
+
+- Full generators still active and unchanged. Main **ap-NT9cm8Mc78qaGB9euDnK99**
+  ACORD checkpoint **27,700 attempts / 23,721 accepted**; corrected
+  **ap-c9DCBmAQMHHS4aJt9MASov** MultiDoc2Dial **15,500 / 11,597**. Eleven main
+  sources remain complete. Never duplicate/redeploy either active generator.
+- Diagnostic V2 **ap-xMrqsZfuSwBgQEdt15djGw** completed and is idle: **58 rows /
+  29 kept / 4 JSON errors**. **All four calibration controls passed.** Read all
+  four decisions; known unsupported answers still reject and both grounded
+  positive controls now keep. No source-wide or release approval was inferred.
+  V2 protocol SHA **d4761fef67921ca8bc01d2e44b0eb79699d682c34ee67d77a74f0e0f8cb01ceb**.
+- Added and ran CPU sampler **ap-eW3giQAhr4Eq8E5aVKg7Uj** via
+  `data.sample_grounding_calibration_modal`. It selects two non-control examples
+  per source/outcome stratum (8 total), preserves all primary evidence and
+  decisions, and records error rows. Artifact in V2 `manual-samples.json`;
+  decisions SHA **46fc01e69decfafd7e86ddd85ffc06634722eb6a654ecee9cb62a7e82e88935f**.
+  Sampler is explicitly pinned to V2 even as current diagnostic runner advances.
+- Read all eight full evidence/answer/decision views. All four additional keeps
+  grounded: Catalonia/Barcelona, Billa Hindi dubbing, sunset definition, braces
+  applications. Two rejects appropriate: claimed freeway range excludes Hawaii's
+  lower source values; Boxer answer adds skull/jaw/prey claims absent from source.
+  Two are valid answers rejected conservatively: Phantom Menace dates are right
+  but the judge miscopies a source year (1998 to 1988); apple-color abstention
+  is accurate but `does not specify` was absent from the mechanical guard regex.
+  Do NOT fuzzy-correct dates; invalid judge quotations remain rejected/diagnostic.
+  These stratified samples are not a source-wide error-rate estimate.
+- Manual review saved in `data/reviews/stage3-grounding-calibration-v2-review.json`
+  and uploaded to V2 `manual-review.json`. Full-source/release approval remains
+  false pending the narrow guard correction's revalidation.
+- V3 changes only the missing abstention phrase plus version identifiers; judge
+  prompts, evidence scope and quote semantics are unchanged. **131 tests passed**
+  in **ap-VThLbktvzQ0DBhSrHmL9Aw**. Tests include appropriate `does not specify`,
+  rejecting its mixed positive assertion variant, and refusing a changed date in
+  a quote. The 58-row preflight and old-vote mechanical replay also passed;
+  the apple sentence now clears its guard (whole-answer fit not yet confirmed).
+- Submitted one separate bounded diagnostic V3 after verifying it was idle:
+  app **ap-DzKVvk81JbxcitfinEMjn2**, deployment **lclm-grounding-claims-pilot-v3**,
+  call **fc-01M200AP2WR3K3ME4PWW97CCQB**. Do not duplicate/redeploy while active.
+  Same 58 rows, pinned Qwen235B/no-thinking, H200:8, max one container, two-hour
+  cap; outputs `/data/stage3-build-20260906/grounding-calibration-claims-v3/`.
+  Current runner targets V3; V1/V2 deployments and artifacts remain intact/idle.
+- Next: inspect V3 controls and recovered apple abstention; if its results and
+  additional manual sample checks support scaling, write explicit hash-bound
+  approval for a conservative full re-review of the **8,506 previously accepted
+  FaithDial+CLAPNQ candidates**, not release approval. Errors/invalid citations
+  must remain counted quarantine reasons. Full-source re-review/materialization
+  code still needs implementation and tests; preserve originals and reflect
+  exclusions in selected-source accounting before any release gate can clear.
+  Continue other source manual reviews and corrected MultiDoc2Dial completion/
+  audit. No expansion export/packing/HF release; base provenance gates remain.
+
+## Historical checkpoint — 2026-09-08 03:27 EDT — diagnostic v1 failed calibration; v2 submitted
 
 - Main **ap-NT9cm8Mc78qaGB9euDnK99** still active: ACORD checkpoint **22,900
   attempts / 19,276 accepted**. Corrected full **ap-c9DCBmAQMHHS4aJt9MASov**
