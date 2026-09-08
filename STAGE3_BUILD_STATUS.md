@@ -49,7 +49,67 @@ removed, while retaining its task and final-answer contract.
 Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
 `/data/stage3-build-20260906/validation/` on the data volume.
 
-## Latest checkpoint — 2026-09-08 05:05 EDT — corrected MD complete; broader manual QA catches additional holds
+## Latest checkpoint — 2026-09-08 05:30 EDT — question-conditioned diagnostic submitted, 88 rows
+
+- Confirmed main **ap-NT9cm8Mc78qaGB9euDnK99** active, unchanged: ACORD last
+  checked at 05:21, **42,300 attempts / 36,487 accepted**. Corrected MD deployment
+  **ap-c9DCBmAQMHHS4aJt9MASov** is idle after completed generation; never rerun it.
+- FaithDial/CLAPNQ full review **ap-MRs5K5BukSZUvrSm1h2dlv** still active and
+  unchanged. Persistent progress at 05:29: **2,850 / 8,506**; FaithDial 1,712
+  kept / 1,121 rejected / 17 errors; CLAPNQ not reached yet. These are partial
+  review decisions, not release rows. Originals unchanged. Do not redeploy it.
+- Implemented separate **data/question_grounding_review.py**, protocol
+  **question-conditioned-claims-v1**, SHA
+  **b0ef33f88afb4655188fd2562b6ed3bf7db607e5a6e8f4612e0b09cff80d2ca3**.
+  Each sentence and final whole-answer check receives the current question,
+  candidate answer and primary evidence, never reference answers or controls.
+  It explicitly checks condition/entity scope, requested dates and ordering,
+  roll-forward periods, exact inclusive/exclusive bounds, and signs/scales/units.
+  Typed issue categories and mechanically checked source quotes fail closed.
+  Still a heuristic judge, not proof. Shared V3 source-scoping/quote helper SHA
+  remains **d633cf782271f5d4ff68705229570e6ba8ad2186ca27f878a8baa5c7dbb63563**;
+  no active inference protocol or generator code was changed.
+- Added 19 unit tests for question/reference separation, read-only review,
+  quote-vs-question mismatch, schema/issue consistency and failure handling.
+  **177 regression tests passed**, CPU **ap-VhlBaT0pFXOl2wnzPeGhFo**.
+- Initial **72-row** CPU preflight **ap-ucS1SNzxDD66IIX0hqgsXJ** passed (70
+  original MAUD/TAT-QA diagnostics + two corrected-MD controls). Those prepared
+  artifacts remain **question-grounding-calibration-v2/**, row SHA
+  **9d50cf3fcd9451f1e3a1b48c7fb52915a32299674ba10beb4b579ff312cd1c81**.
+  No GPU used that input. Before inference, expanded to a separately versioned
+  input with **16 fresh non-control MD samples**, eight per single/multi bucket,
+  so MD calibration is not based only on the two already-inspected controls.
+- Final input **/data/stage3-build-20260906/question-grounding-calibration-v3/**
+  has **88 rows = 18 MAUD + 52 TAT-QA + 18 corrected MD**, **eight controls
+  (four positive / four negative)**. Row SHA
+  **43322d45243b9fb70e1f4a677ced674cb00ee9f903072ed85941917674cb9a62**.
+  CPU **ap-yn2jpMJbm4GWSNqVUiAIVE** rehashed all three original sources and
+  checked controls against their hash-bound manual reviews. All candidate
+  bytes preserved. Pinned Qwen decoder-template preflight passed: maximum
+  **3,489 prompt tokens + 2,048 output budget < 32,768**. Manifest, rows and
+  preflight are immutable/version-bound; startup rechecks all of them.
+- Deployed separate **lclm-question-grounding-pilot-v1**, verified deployment
+  had zero tasks, then submitted exactly once: **ap-eXdiwJYWWrjl0lZsRFoBKP**,
+  call **fc-01M205M156EJYMNJ4DBAQ0Q0WW**. Module
+  **data.run_question_grounding_calibration_modal::pilot**. H200:8, max one
+  container, **two-hour cap**, concurrency eight, pinned Qwen235B-Instruct,
+  temperature zero and thinking disabled. Per-row fsync/volume checkpoints.
+  Outputs **/data/stage3-build-20260906/question-grounding-claims-v1/**.
+  Submission confirmed; startup/results need checking. Do not duplicate or
+  redeploy while active. Local entrypoint runs CPU preflight only.
+- **Next:** inspect the 88-row report, every control decision and fresh
+  non-control kept/rejected examples (especially MD). Passing controls alone
+  is not scale approval. If any control fails, retain diagnostics and inspect
+  whether semantic judgment or quote/schema handling failed; never tune away
+  the negative labels or silently edit traces. No full-source option or release
+  side effect exists in this pilot. MAUD, TAT-QA and corrected MD holds remain.
+  After approved calibration, implement separately versioned full review with
+  explicit approvals/limits, then retained-subset materialization, exclusion
+  accounting and fresh audits/manual review. Await active FaithDial/CLAPNQ
+  completion separately. Base provenance/terms still block HF publication;
+  expansion export/packing and final all-component GPU validation remain undone.
+
+## Historical checkpoint — 2026-09-08 05:05 EDT — corrected MD complete; broader manual QA catches additional holds
 
 - Main **ap-NT9cm8Mc78qaGB9euDnK99** remains active and unchanged: ACORD
   **39,600 attempts / 34,015 accepted**. FaithDial/CLAPNQ full grounding review

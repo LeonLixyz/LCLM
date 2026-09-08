@@ -27,7 +27,7 @@ def test():
                 quote_replay.append({'task_id': decision['task_id'],
                     'old_all_sentences_pass': all(s['keep'] for s in decision['sentences']),
                     'new_all_sentences_pass': all(s['keep'] for s in new)})
-    files = ['test_accounting_answer_review.py', 'test_grounding_full_review_gate.py', 'test_grounding_claim_review.py', 'test_expansion_release_selection.py', 'test_stage3_release_checks.py',
+    files = ['test_question_grounding_review.py', 'test_accounting_answer_review.py', 'test_grounding_full_review_gate.py', 'test_grounding_claim_review.py', 'test_expansion_release_selection.py', 'test_stage3_release_checks.py',
              'test_multidoc2dial_dialogue.py', 'test_expansion_corrective_paths.py', 'test_corrective_expansion_review.py',
              'test_expansion_judge_json.py', 'test_expansion_task_normalization.py',
              'test_harvest_expansion_trace.py']
