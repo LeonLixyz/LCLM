@@ -1,0 +1,49 @@
+{
+  "status": "approved_for_full_source_review",
+  "approved_for_full_source_review": true,
+  "approved_for_release": false,
+  "scope": "Internal approval to run the unchanged conservative V3 reviewer over the 8,506 previously accepted held-source candidates only. Not approval to publish or silently remove rows.",
+  "protocol_sha256": "d633cf782271f5d4ff68705229570e6ba8ad2186ca27f878a8baa5c7dbb63563",
+  "decisions_sha256": "b5156fed85ad65752eab0d513afcfb2c85e85126f2341eeef40576b4fb68c10a",
+  "input_rows_sha256": "f1caf75d1e4716aaa8cb49c710b13cd1fa15726fdf6103405dbc4ae3dc0a2eac",
+  "target_sources": {
+    "faithdial": 7884,
+    "clapnq": 622
+  },
+  "reviewed_task_ids": [
+    "rea3-171728c2c0227b50e6b4aba0",
+    "rea3-28e72a2aeab8d2669a3b2838",
+    "rea3-37018cffcd551f8a937b73c9",
+    "rea3-370741a99f2f22bab2d8f06d",
+    "rea3-417c829d65c54ffbb8b35159",
+    "rea3-485f8980a759552ce06d42ec",
+    "rea3-4e3acf4976c961a52b09101d",
+    "rea3-5fdc65e84b8db045fbc2fdfe",
+    "rea3-7f16487c5d987f910ab121b1",
+    "rea3-8844ee6d4abf8c64eb9ede57",
+    "rea3-af40e67daccef4fc895e2a3a",
+    "rea3-bbcb3871091371fa53127fd8",
+    "rea3-d513c93f55ba7c3827c50452",
+    "rea3-db54b0a81ee6efd6c983be9f"
+  ],
+  "calibration": {
+    "rows": 58,
+    "kept": 31,
+    "errors": 3,
+    "all_four_controls_passed": true
+  },
+  "observations": [
+    "Read V3 control decisions and the recovered apple-color abstention: all agree with manual assessment.",
+    "Rechecked V3 decisions for previously reviewed Catalonia, Billa, sunset, braces, film dates, speed-limit table and Boxer cases against their unchanged primary evidence. Known date-quotation typo remains conservatively rejected, not labeled an incorrect candidate answer.",
+    "Read the complete new We Are the World source and question: every listed soloist appears in the primary passage and the answer addresses the requested list.",
+    "Read the complete new Waikato source and question: river origin on Mount Ruapehu and mouth at Port Waikato are explicitly present.",
+    "Read the new hamburger reject: primary source supports only preparation methods; other answer details come from dialogue history, not the scoped primary evidence. This is a conservative source-only exclusion, not a claim that every excluded assertion is false.",
+    "No unsupported answer was found among the additional manually inspected keeps. These selected cases do not establish a source-wide error rate or eliminate same-model judge uncertainty."
+  ],
+  "release_conditions": [
+    "Keep original accepted JSONL byte-for-byte unchanged. Write full review decisions to a separate versioned directory.",
+    "Count every candidate once as kept, rejected, or error. Preserve parsing/citation failures as explicit quarantine reasons; do not auto-repair dates or hide false rejections.",
+    "Before integrating retained traces, perform full artifact audit, fresh source-stratified manual sampling, exact old/new source replacement accounting and provenance binding.",
+    "All source/license/split, raw/packing consistency, assistant-label, no-memory distributed training and final publication gates remain required."
+  ]
+}

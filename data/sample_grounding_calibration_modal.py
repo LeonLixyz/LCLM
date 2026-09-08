@@ -4,14 +4,15 @@ import json
 import modal
 from data.stage3_full_modal import ROOT, image, volume
 
-app = modal.App('lclm-grounding-calibration-manual-samples-v2')
+app = modal.App('lclm-grounding-calibration-manual-samples')
 
 
 @app.function(image=image, cpu=2, memory=8192, timeout=600, volumes={'/data': volume})
-def sample():
+def sample(version: str = 'v2'):
     from data.run_grounding_calibration_modal import load_inputs
     from data.grounding_claim_review import primary_evidence
-    OUTPUT = ROOT/'grounding-calibration-claims-v2'  # This artifact samples V2, not the latest runner.
+    if version not in ('v2', 'v3'): raise ValueError('Unknown diagnostic version')
+    OUTPUT = ROOT/f'grounding-calibration-claims-{version}'
     rows, manifest, _ = load_inputs(); by_id = {r['task_id']: r for r in rows}
     report = json.loads((OUTPUT/'report.json').read_text())
     if report['status'] != 'complete' or not report['calibration_passed']:
@@ -38,6 +39,17 @@ def sample():
             examples.append({'source': source, 'outcome': outcome, 'task_id': task_id,
                 'selection_hash': score, 'question': row['task'], 'answer': row['messages'][-1]['content'],
                 'primary_evidence': primary_evidence(row), 'decision': decision})
+    if version == 'v3':
+        previous = {r['task_id']: r for r in (json.loads(line) for line in
+            (ROOT/'grounding-calibration-claims-v2/decisions.jsonl').read_text().splitlines())}
+        included = {r['task_id'] for r in examples}
+        for decision in decisions:
+            task_id = decision['task_id']
+            if decision['keep'] and not previous[task_id]['keep'] and task_id not in included:
+                row = by_id[task_id]
+                examples.append({'source': sources[task_id], 'outcome': 'new_keep', 'task_id': task_id,
+                    'question': row['task'], 'answer': row['messages'][-1]['content'],
+                    'primary_evidence': primary_evidence(row), 'decision': decision})
     artifact = {'status': 'awaiting_manual_review', 'approved': False,
                 'decisions_sha256': hashlib.sha256(content).hexdigest(),
                 'protocol_sha256': report['manifest']['protocol_sha256'],
@@ -50,5 +62,5 @@ def sample():
 
 
 @app.local_entrypoint()
-def main():
-    print(json.dumps(sample.remote(), indent=2))
+def main(version: str = 'v2'):
+    print(json.dumps(sample.remote(version), indent=2))

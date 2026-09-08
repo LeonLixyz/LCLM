@@ -49,7 +49,50 @@ removed, while retaining its task and final-answer contract.
 Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
 `/data/stage3-build-20260906/validation/` on the data volume.
 
-## Latest checkpoint — 2026-09-08 03:58 EDT — V2 controls passed; extra manual review and V3 guard fix
+## Latest checkpoint — 2026-09-08 04:33 EDT — V3 calibrated; full held-source review submitted
+
+- Main **ap-NT9cm8Mc78qaGB9euDnK99** remains active and unchanged: ACORD
+  **34,300 attempts / 29,372 accepted**. Corrected MultiDoc2Dial
+  **ap-c9DCBmAQMHHS4aJt9MASov** remains active: **19,400 / 14,573** of 21,451.
+  Eleven main sources are complete (100,833 attempted / 46,443 accepted,
+  including held originals). Corrected MD replaces old MD, never additive.
+- V3 diagnostic **ap-DzKVvk81JbxcitfinEMjn2** completed: **58 reviewed / 31
+  kept / 3 JSON errors**, all four controls passed. Decisions SHA
+  **b5156fed85ad65752eab0d513afcfb2c85e85126f2341eeef40576b4fb68c10a**.
+  CPU sampler **ap-xBgIl7VhmKp4b92zwh4dXo** wrote ten full evidence/answer
+  examples in V3 `manual-samples.json`, including newly kept answers versus V2.
+- Reviewed controls and additional source/outcome samples. Newly kept apple
+  abstention, We Are the World soloists and Waikato endpoints are grounded.
+  Date-quotation errors remain excluded even where candidate answers are right;
+  hamburger details from dialogue history are excluded under the source-only
+  evidence policy. Do not describe all exclusions as false answers. Same-model
+  judgment and limited manual samples do not establish a source-wide error rate.
+- Hash-bound internal scale approval saved in
+  `data/reviews/stage3-grounding-calibration-v3-review.json` and uploaded to V3
+  `manual-review.json`. It permits reviewing **7,884 FaithDial + 622 CLAPNQ =
+  8,506 candidates**, NOT filtering or release. Original source holds remain.
+- Implemented fail-closed scale gate and review-only full job in
+  `data/grounding_full_review_gate.py` and `data/full_grounding_review_modal.py`.
+  **148 regression tests passed** on **ap-7sYVGuS9cYayG8x6G4UZ4X**.
+  CPU preflight **ap-h6VnP0hzQFqrtq2XfWNs4m** passed all 8,506 rows and source
+  hashes against format audits, binding calibration decisions, manual approval
+  and protocol SHA **d633cf782271f5d4ff68705229570e6ba8ad2186ca27f878a8baa5c7dbb63563**.
+- Deployed separate **lclm-held-sources-grounding-review-v3**, verified idle,
+  then submitted exactly once: **ap-MRs5K5BukSZUvrSm1h2dlv**, call
+  **fc-01M202D1QK2YP27ZN3AATPG608**. H200:8, max one container, 12-hour cap,
+  concurrency 8, pinned Qwen235B-Instruct/no-thinking. Do not duplicate/redeploy
+  while active. Outputs `/data/stage3-build-20260906/full-grounding-review-v3/`;
+  decisions/progress checkpoint every 50 rows. Errors stay explicit, originals
+  unchanged, no export/filter/publication side effect. Submission is confirmed;
+  inference startup/completion still needs checking.
+- Next: monitor this review and the two generators. Audit and manually review
+  corrected MD once complete; continue other source manual reviews. After full
+  held-source review, implement separate retained-row materialization with
+  explicit exclusions and fresh audits/manual review before changing release
+  selection. No expansion export/packing/HF release yet. Original base-mixture
+  provenance/terms remain unresolved and block publication, not generation.
+
+## Historical checkpoint — 2026-09-08 03:58 EDT — V2 controls passed; extra manual review and V3 guard fix
 
 - Full generators still active and unchanged. Main **ap-NT9cm8Mc78qaGB9euDnK99**
   ACORD checkpoint **27,700 attempts / 23,721 accepted**; corrected
