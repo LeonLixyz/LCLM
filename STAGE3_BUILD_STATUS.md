@@ -49,7 +49,37 @@ removed, while retaining its task and final-answer contract.
 Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
 `/data/stage3-build-20260906/validation/` on the data volume.
 
-## Latest user request — 2026-09-08 11:40 EDT — acceptance breakdown and larger-Qwen pilot
+## Latest user request — 2026-09-08 11:55 EDT — Qwen3.8-27B non-thinking comparison
+
+- User selected **Qwen/Qwen3.8-27B** as an alternative with instruct mode.
+  Official card confirms `chat_template_kwargs.enable_thinking=false`; no need
+  to ask again about 2.4T low-effort thinking. Model revision pinned to
+  **1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0**. This is a newer, smaller dense
+  model, not an established quality upgrade over 235B.
+- Added isolated **data.qwen38_27b_pilot_modal**, app
+  **lclm-qwen38-27b-teacher-pilot-v1**, output **qwen38-27b-teacher-pilot-v1/**
+  under the build root. **24 paired diagnostic cases**, first two accepted and
+  two rejected saved rows per BillSum/FinQA/TAT-QA/ContractNLI/FaithDial/CLAPNQ,
+  matched to original prepared tasks. Selection is balanced convenience sampling,
+  not a representative acceptance-rate estimate. No source regeneration or
+  held-source exclusion has been authorized by this comparison.
+- Identical temperature 0, 2,048 output tokens/turn, 16-call budget and original
+  teacher/task prompts; Qwen3.8 native tool parser, no thinking, CoT harvesting.
+  API raw requests/responses stay separate from diagnostic traces. No new
+  self-judge: fixed-answer rules are reported separately; free-form answers need
+  manual paired review. No pilot trace can pass release selection automatically.
+- CPU prepare run **ap-ExW3vuHv7N02aTQb2GZ6iI** is building the serving image
+  before preparing inputs. Local command session **30228**. No pilot inference
+  yet; no deployed pilot call yet. Main 235B **ap-NT9cm8Mc78qaGB9euDnK99** is
+  unchanged. Finish preparation, deploy this separate app, then explicitly
+  `.spawn()` its `pilot` function once and record the call. Never redeploy main.
+- Runtime: official **vllm/vllm-openai:v0.28.0**, transformers **5.16.1**,
+  H200:8, 32K context, TP8, concurrency4, 90-minute maximum. No DFlash claim for
+  this 27B deployment; official recipe supports native tools/non-thinking.
+  Sources: https://huggingface.co/Qwen/Qwen3.8-27B and
+  https://recipes.vllm.ai/Qwen/Qwen3.8-27B . All previous release holds persist.
+
+## Previous user request — 2026-09-08 11:40 EDT — acceptance breakdown and larger-Qwen pilot
 
 - Re-read all 12 completed main-source generation reports plus BillSum checkpoint
   **4,900 attempts / 231 accepted**. Main totals **164,262 attempted / 97,490
