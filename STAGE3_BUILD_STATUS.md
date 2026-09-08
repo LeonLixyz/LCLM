@@ -49,7 +49,37 @@ removed, while retaining its task and final-answer contract.
 Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
 `/data/stage3-build-20260906/validation/` on the data volume.
 
-## Latest checkpoint — 2026-09-08 07:41 EDT — ACORD reviewed; full grounding review fails fresh manual QA
+## Latest checkpoint — 2026-09-08 08:00 EDT — BillSum partial diagnostic; generation unchanged
+
+- Main **ap-NT9cm8Mc78qaGB9euDnK99** remains deployed with one active task.
+  No GPU restart, model change, or verifier change. BillSum snapshot has
+  **700 attempted / 35 accepted (5%)**; this is not a completed-source count.
+- CPU diagnostic **ap-LO04KOvwZsyWsTc3Alscrw** completed. Saved byte hashes,
+  reason counts, eight deterministic bucket samples and untruncated primary
+  evidence under **running-source-diagnostics/billsum/a7a07b63b20ddde750a654bc977a94c10c90633bf780bf8c7f572d92c34914ad/**.
+  It checks complete JSONL lines, unique IDs and accepted/rejected flags, never
+  mutates training rows or grants release approval.
+- **556** wrong-answer verdicts comprise **60** dual-judge and **496** summary-
+  claim-stage rejects. Other rejects: **101 JSONDecodeError, 4 missing support,
+  2 unknown segment, 1 invalid segment ID, 1 ValueError**. Claim-level counts
+  include **737 supported-but-unmatched quotation flags**; these are not rows.
+- Read full primary evidence for accepted, dual-judge-rejected and claim-rejected
+  examples. Accepted education-bill summary appears grounded; insurance summary
+  blurs 2007 termination versus conditional residual 2008 coverage. The security-
+  contractor summary has scope ambiguities, plus a confirmed verifier limitation:
+  a supported quote crosses primary chunks and the inserted **SOURCE 112:part1**
+  header breaks whitespace-only matching. Do not count every reject as factually
+  wrong or automatically recover these rows.
+- Saved exception samples show **Expecting value: line 1 column 1 (char 0)** and
+  **Unexpected text after FINAL line**. The broad exception handler does not save
+  failure phase/raw failed response; exact JSON failure cause is unresolved.
+  Review: **data/reviews/stage3-billsum-running-diagnostic.json**.
+- All prior source holds and base-provenance/publication gates remain. No final
+  expansion export, packing or HF release. No explicit exclude-vs-rebuild choice
+  for FaithDial/CLAPNQ has been received; generic continuation does not choose one.
+  Continue the current job, then full-source audits and fresh accepted-sample QA.
+
+## Historical checkpoint — 2026-09-08 07:41 EDT — ACORD reviewed; full grounding review fails fresh manual QA
 
 - Main **ap-NT9cm8Mc78qaGB9euDnK99** is active, unchanged, now on BillSum.
   ACORD completed **58,529 attempts / 50,816 accepted**, with 6,625 exact-answer

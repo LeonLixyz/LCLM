@@ -59,8 +59,74 @@ def audit():
     return out
 
 @app.local_entrypoint()
-def main(tests:bool=False, samples:bool=False, version:str='v6', sources:str='finqa,convfinqa,clapnq,lex_glue'):
-    print(json.dumps(test.remote() if tests else inspect_pilot.remote(version,sources) if samples else audit.remote(),indent=2))
+def main(tests:bool=False, samples:bool=False, version:str='v6', sources:str='finqa,convfinqa,clapnq,lex_glue', running_source:str=''):
+    print(json.dumps(inspect_running_source.remote(running_source) if running_source else
+        test.remote() if tests else inspect_pilot.remote(version,sources) if samples else audit.remote(),indent=2))
+
+
+@app.function(image=image,cpu=2,memory=16384,timeout=1800,volumes={'/data':volume})
+def inspect_running_source(source:str):
+    """Committed prefix diagnostics only; never full-source approval or recovery."""
+    import hashlib
+    from collections import Counter
+    from datetime import datetime, timezone
+    from data.build_full_expansion_tasks_modal import SOURCES
+    from data.grounding_claim_review import primary_evidence
+    if source not in SOURCES: raise ValueError('Unknown running source')
+    volume.reload()
+    generated=Path('/data/stage3-agent/real-expansion/pilots/full-20260906-v6')
+    progress=json.loads((generated/(source+'.progress.json')).read_text())
+    seen=set(); counts=Counter(); details=Counter(); selected={}; files=[]
+    for accepted in (True,False):
+        path=generated/(source+('.accepted.jsonl' if accepted else '.rejected.jsonl'))
+        digest=hashlib.sha256(); rows=0
+        with path.open('rb') as stream:
+            for line in stream:
+                if not line.endswith(b'\n'): raise ValueError('Incomplete diagnostic snapshot line')
+                digest.update(line); row=json.loads(line); rows+=1
+                task_id=row['task_id']; verdict=row['verification']
+                if task_id in seen or verdict['accepted'] is not accepted: raise ValueError('Invalid snapshot row')
+                seen.add(task_id); reason=verdict['reason']; counts[reason]+=1
+                semantic=verdict.get('semantic_review',{})
+                if semantic:
+                    claims=semantic.get('summary_claims')
+                    if accepted: bucket='accepted'
+                    elif claims is not None: bucket='summary_claim_rejected'
+                    else: bucket='dual_judge_rejected'
+                    if claims is not None:
+                        for claim in claims['claims']:
+                            details['claim_supported_'+str(claim['supported'])+'_quotes_'+str(claim['quotes_present'])]+=1
+                    else:
+                        for name in ('blind_vote','reference_vote'):
+                            if name in semantic: details[name+':'+json.dumps(semantic[name],sort_keys=True)]+=1
+                else: bucket=reason
+                score=hashlib.sha256(('running-source-diagnostic-v1:'+task_id).encode()).hexdigest()
+                if bucket not in selected or score<selected[bucket][0]: selected[bucket]=(score,row)
+        files.append({'path':str(path),'rows':rows,'sha256':digest.hexdigest()})
+    snapshot_sha=hashlib.sha256(json.dumps(files,sort_keys=True).encode()).hexdigest()
+    examples=[{'bucket':k,'selection_hash':v[0],'training_row':v[1]} for k,v in sorted(selected.items())]
+    primary=[]
+    for example in examples:
+        row=example['training_row']
+        view={'bucket':example['bucket'],'task_id':row['task_id'],'question':row.get('task'),
+              'reference':row.get('gold_answer'),'verification':row['verification'],
+              'assistant_messages':[m for m in row.get('messages',[]) if m['role']=='assistant']}
+        try: view['primary_evidence']=primary_evidence(row)
+        except Exception as exc: view['evidence_error']=type(exc).__name__+': '+str(exc)
+        primary.append(view)
+    report={'status':'partial_snapshot_diagnostic_only','source':source,'at':datetime.now(timezone.utc).isoformat(),
+        'files':files,'snapshot_sha256':snapshot_sha,'rows_observed':len(seen),'reason_counts':dict(counts),
+        'review_details':dict(details),'progress_checkpoint':progress,'samples':len(examples),
+        'training_rows_modified':False,'approved_for_release':False,
+        'limits':'Committed file snapshot, not completed-source accounting. Progress checkpoint can lag observed files. Every reason bucket sampled by minimum hash; no new inference.'}
+    destination=ROOT/'running-source-diagnostics'/source/snapshot_sha
+    destination.mkdir(parents=True,exist_ok=True)
+    for name,value in [('report.json',report),('samples.json',examples),('primary-evidence.json',primary)]:
+        path=destination/name
+        if path.exists(): raise ValueError('This snapshot already has diagnostics; read existing artifacts')
+        path.write_text(json.dumps(value,ensure_ascii=False,indent=2))
+    volume.commit()
+    return {**report,'output':str(destination)}
 
 @app.function(image=image,timeout=600,volumes={'/data':volume})
 def test():
