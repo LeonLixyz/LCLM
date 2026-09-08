@@ -12,11 +12,11 @@ from data.generate_real_expansion_modal import (
     image, data_volume, hf_cache_volume, CACHE_ROOT, PROJECT_ROOT,
     MODEL_ID, MODEL_REVISION, SERVED_MODEL_NAME)
 
-APP_NAME = 'lclm-grounding-claims-pilot-v1'
+APP_NAME = 'lclm-grounding-claims-pilot-v2'
 app = modal.App(APP_NAME)
 ROOT = Path('/data/stage3-build-20260906')
 INPUT = ROOT/'grounding-calibration-v1'
-OUTPUT = ROOT/'grounding-calibration-claims-v1'
+OUTPUT = ROOT/'grounding-calibration-claims-v2'
 EXPECTED_SHA = 'f1caf75d1e4716aaa8cb49c710b13cd1fa15726fdf6103405dbc4ae3dc0a2eac'
 
 

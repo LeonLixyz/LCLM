@@ -2,7 +2,7 @@ import copy
 import json
 import pytest
 from data.grounding_claim_review import (
-    primary_evidence, answer_sentences, sentence_messages, validate_sentence_vote, review_claims, parse_object)
+    primary_evidence, answer_sentences, sentence_messages, validate_sentence_vote, review_claims, parse_object, quote_normalize)
 
 
 def row():
@@ -53,7 +53,7 @@ def test_malformed_vote_fails_closed(change):
 
 def test_complete_review_is_read_only_and_never_sends_reference_or_control():
     candidate = row(); original = copy.deepcopy(candidate); requests = []
-    answers = iter([json.dumps(vote()), '{"correct":true,"grounded":true}'])
+    answers = iter([json.dumps(vote()), '{"correct":true,"grounded":true,"issue":"none"}'])
     def complete(messages):
         requests.append(messages); return next(answers)
     result = review_claims(candidate, complete)
@@ -83,3 +83,22 @@ def test_fenced_json_and_bad_types():
 def test_source_prefix_collision_not_accepted():
     candidate = row(); candidate['messages'][1]['content'] = 'SOURCE primary2:part0\nWrong source.'
     with pytest.raises(ValueError): primary_evidence(candidate)
+
+
+@pytest.mark.parametrize('source,quote', [
+    ("I ca n't describe it , but it 's personal .", "I can't describe it, but it's personal."),
+    ("We do n't agree ; you 're mistaken !", "We don't agree; you're mistaken!"),
+    ('The rate is 12.5 % .', 'The rate is 12.5%.')])
+def test_source_tokenization_spacing_is_reversible(source, quote):
+    assert quote_normalize(source) == quote_normalize(quote)
+
+
+@pytest.mark.parametrize('source,quote', [('not able', 'notable'), ('-2', '2'),
+    ('12.5', '125'), ('no evidence', 'evidence'), ('must not', 'must'), ('red, blue', 'red blue')])
+def test_normalization_preserves_semantically_meaningful_characters(source, quote):
+    assert quote_normalize(source) != quote_normalize(quote)
+
+
+def test_inconsistent_fit_reason_fails_closed():
+    answers = iter([json.dumps(vote()), '{"correct":true,"grounded":true,"issue":"unsupported_claim"}'])
+    with pytest.raises(ValueError): review_claims(row(), lambda _: next(answers))

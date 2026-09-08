@@ -49,7 +49,54 @@ removed, while retaining its task and final-answer contract.
 Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
 `/data/stage3-build-20260906/validation/` on the data volume.
 
-## Latest checkpoint — 2026-09-08 02:58 EDT — claim-grounding diagnostic submitted
+## Latest checkpoint — 2026-09-08 03:27 EDT — diagnostic v1 failed calibration; v2 submitted
+
+- Main **ap-NT9cm8Mc78qaGB9euDnK99** still active: ACORD checkpoint **22,900
+  attempts / 19,276 accepted**. Corrected full **ap-c9DCBmAQMHHS4aJt9MASov**
+  still active: MultiDoc2Dial **12,600 / 9,357**. Eleven main sources complete.
+  Do not duplicate/redeploy either generator.
+- Diagnostic V1 **ap-D6B6a2sq9oR6r05ny7F7rz** completed and scaled to zero tasks:
+  **58 reviewed / 25 kept / 1 JSON error**. **Calibration FAILED**: both known
+  unsupported/ambiguous controls were correctly rejected, but both grounded
+  controls were also rejected. Do not scale V1 or integrate its 25 keeps.
+- Read all four saved control decisions. FaithDial hair-movement control passed
+  every sentence (including both pure abstentions), then failed whole-answer fit.
+  CLAPNQ Little Lion Man control had supported=true for each sentence, but model
+  quotes detokenized source punctuation/contractions, failing strict whitespace-
+  only matches. The negative legal control was rejected, yet some individual
+  supporting quotes were unrelated states: exact quotation presence is not
+  entailment. One separate row `rea3-147e05e976dc2d3250eb1477` had malformed JSON
+  (Extra data), kept as an error. Manual failure review saved in
+  `data/reviews/stage3-grounding-calibration-v1-review.json` and uploaded to V1
+  `manual-review.json`. Its protocol SHA is
+  **481ffed1317eb6bde6284e157991fcb09a2341f1e83094a3a0989bdb58b83f6d**.
+- Protocol V2 conservatively normalizes source tokenization spacing around
+  punctuation and contractions for quote matching; it does not delete semantic
+  characters or merge ordinary words. Describe checks as detokenized quote
+  presence, NOT byte-exact quoting. Whole-answer prompt clarifies current-turn
+  justified abstention and returns a typed issue category; inconsistent booleans/
+  categories fail closed. No references or manual labels enter judge prompts.
+- **128 tests passed** in **ap-gfSE5Tk5euNUHp7hXodGBO** and again in
+  **ap-saxoQDm1kjNpHEmdBYFGPW**. Second run replayed saved V1 sentence votes on
+  all real candidates without model calls: five rows' quotation checks recover,
+  including the known CLAPNQ positive; this is not a final-answer/model pass.
+  Both runs preflighted the pinned 58-row input. Known V1 failures remain held.
+- Deployed separate **lclm-grounding-claims-pilot-v2**, app
+  **ap-xMrqsZfuSwBgQEdt15djGw**; verified idle then submitted once:
+  **fc-01M1ZYJEVRMMTCA0T0CMZG15QJ**. Do not duplicate/redeploy while active.
+  Same bounded 58 rows, H200:8/max one container/two-hour limit, pinned Qwen235B,
+  no thinking and eight concurrent reviews. Output is separately versioned:
+  `/data/stage3-build-20260906/grounding-calibration-claims-v2/`.
+  V1 cloud deployment and outputs are untouched; Git history retains V1 code.
+  Current `data.run_grounding_calibration_modal` addresses V2 only.
+- V2 submission confirmed; completion still needs checking. Next inspect controls
+  and additional non-control kept/rejected cases. Passing tuned controls alone is
+  insufficient for scale. Neither source hold is lifted. No source-wide review,
+  export, packing or HF publication launched. Continue remaining source manual
+  reviews and full-generation monitoring, then corrected full-source audits.
+  Base provenance and final packing/GPU/release gates remain unresolved.
+
+## Historical checkpoint — 2026-09-08 02:58 EDT — claim-grounding diagnostic submitted
 
 - Existing full jobs unchanged: main **ap-NT9cm8Mc78qaGB9euDnK99** ACORD latest
   inspected checkpoint **18,100 attempts / 15,073 accepted**; corrected full
