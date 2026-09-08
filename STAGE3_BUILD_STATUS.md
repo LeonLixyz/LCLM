@@ -49,7 +49,28 @@ removed, while retaining its task and final-answer contract.
 Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
 `/data/stage3-build-20260906/validation/` on the data volume.
 
-## Latest checkpoint — 2026-09-08 13:35 EDT — official-sampling pilot reviewed
+## Latest checkpoint — 2026-09-08 14:32 EDT — generation advancing; DFlash research only
+
+- Main app **ap-NT9cm8Mc78qaGB9euDnK99** remains active with one task; 27B
+  pilot remains idle. BillSum **8,000 attempted / 405 accepted**: 6,008 semantic,
+  1,543 JSONDecodeError, 20 missing support, 20 ValueError, 3 unknown-segment,
+  1 invalid-segment reject. No restart, new inference, or release-gate change.
+- Latest user asked whether 27B is better and has a Modal DFlash endpoint.
+  Answered: **not established better than235B**; 18-to20 clean traces compared
+  two27B sampling configurations. Existing27B pilots used no DFlash.
+- Read-only public research found **z-lab/Qwen3.8-27B-DFlash2**, a mirror of
+  **incoai/Qwen3.8-27B-DFlash2**, with SGLang and vLLM serving recipes:
+  https://huggingface.co/z-lab/Qwen3.8-27B-DFlash2 . The card's vLLM recipe
+  points to PR52816, so do not assume our pinned v0.28.0 runtime supports it
+  without checking. Published H200 speedups use thinking workloads, not our
+  nonthinking long-document trajectories; no task-specific speedup measured.
+- Could not verify a ready-made Modal27B+DFlash managed endpoint from public
+  listings. Modal's explicitly documented custom-DFlash shared model is2.4T:
+  https://modal.com/blog/qwen3-8-2-4t-a95b-now-available-on-modal . No endpoint
+  created or DFlash code/GPU experiment run; the user's question was informational.
+  All existing source quality, provenance, completion and release holds persist.
+
+## Previous checkpoint — 2026-09-08 13:35 EDT — official-sampling pilot reviewed
 
 - **14:02 EDT monitoring check:** main app remains active with one task; pilot
   remains idle. BillSum **7,500 attempts / 384 accepted**, saved at14:00:
