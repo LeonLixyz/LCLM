@@ -1,0 +1,31 @@
+{
+  "source": "multidoc2dial",
+  "status": "needs_dialogue_rendering_fix",
+  "approved": false,
+  "scope": "Manual evidence review of two deterministic full-run samples; not a complete semantic audit or release approval",
+  "accepted_file_sha256": "6a343b031681dec6f2e1140cf39cb1eb92e0a13b7df3de16275645111a39d44f",
+  "upstream_revision": "1108a969d076f04c7367f0c2427d1c5d6d6bdaa0",
+  "sample_artifact": "/data/stage3-build-20260906/full-expansion-manual-review-samples/multidoc2dial.json",
+  "reviewed_examples": [
+    {
+      "task_id": "rea3-d5746aefd0c794df8da2696f",
+      "category": "multi",
+      "evidence_review": "Expanded source contains the 10-year, discharge-plus-5-year and former-POW-plus-1-year rating alternatives stated in the answer. The answer is not a full eligibility checklist; do not treat this limited evidence check as comprehensive legal advice validation.",
+      "prompt_issue": "Current question is followed by unlabelled reverse-chronological dialogue history, including unrelated prior topics. The current question and history need explicit boundaries."
+    },
+    {
+      "task_id": "rea3-cf153765970ba80fbad94d41",
+      "category": "single",
+      "evidence_review": "Expanded DMV document directly supports MV-232, optional document-replacement fees and automatic title-record address update.",
+      "prompt_issue": "Prior name-change dialogue follows the current address-change question in reverse order, without a history heading, making the current request unnecessarily ambiguous."
+    }
+  ],
+  "cause": "Upstream question encoding is current utterance + [SEP] + reverse-ordered prior turns joined with ||. full_expansion_tasks.py only replaces [SEP] with a newline; it does not decode/render the history.",
+  "required_followup": [
+    "Verify the question encoding against the pinned upstream builder and raw dialogue rows.",
+    "Implement and test chronological history rendering with explicit current-request boundaries, preserving every utterance and source document.",
+    "Prepare a versioned source-specific corrective pilot and regenerate/revalidate this source as needed. Do not mutate the live V6 input or accepted files, or silently rewrite saved prompts after generation.",
+    "Keep original V6 MultiDoc2Dial files as diagnostics until a reviewed replacement is available; final publication must not approve this unresolved review.",
+    "Other source generation can continue unchanged."
+  ]
+}

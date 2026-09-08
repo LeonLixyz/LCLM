@@ -49,7 +49,37 @@ removed, while retaining its task and final-answer contract.
 Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
 `/data/stage3-build-20260906/validation/` on the data volume.
 
-## Latest checkpoint — 2026-09-07 22:52 EDT — ninth source complete, audit running
+## Latest checkpoint — 2026-09-07 23:28 EDT — ninth format audit passed; manual prompt issue found
+
+- Generator **ap-NT9cm8Mc78qaGB9euDnK99**, call
+  **fc-01M1ZB04K1DJ94V1PGWTGC9224**, remains healthy. FaithDial checkpoint:
+  **5,000 attempts / 1,922 accepted**. Nine completed sources plus checkpoint:
+  **87,431 attempts / 40,450 accepted** (not final release-approved counts).
+- MultiDoc2Dial full-format audit passed all **13,268 rows**, zero failures,
+  **20,051 calls / 4,973 multi-expansion rows**, minimum segment **598 tokens**.
+  App **ap-OyEpu1agGPUnA0nYWRdVLt** completed. Across nine completed sources:
+  **38,528 rows format-audited**, 61,047 calls, 13,956 multi-expansion rows.
+- New deterministic manual-QA sampler in `data/sample_full_expansion_review_modal.py`
+  ran successfully in **ap-0obOuINRDqJJet7Q0rFeUK**. It binds the accepted-file
+  hash, chooses lowest-hash single/multi examples, saves full rows and untruncated
+  tool-evidence views. Volume: `full-expansion-manual-review-samples/multidoc2dial.*`.
+- **Manual review found a MultiDoc2Dial prompt-rendering issue despite passing
+  structure checks. Do not approve this source for final release yet.** Its
+  upstream `question` field stores current utterance + [SEP] + reverse-ordered
+  prior turns separated by ||; our adapter only replaces [SEP] with a newline.
+  Both sampled questions therefore append unlabeled backwards history after
+  the current question. Sample answers have supporting evidence, but the prompt
+  chronology/boundaries should be corrected and revalidated separately.
+- Recorded detailed non-approval in
+  `data/reviews/stage3-full-multidoc2dial-review.json`. Source snapshot revision
+  **1108a969d076f04c7367f0c2427d1c5d6d6bdaa0**. Upstream main builder confirms
+  the encoding; verify pinned builder/raw dialogue before implementing repair.
+  Next: versioned source-specific rendering correction + pilot/revalidation.
+  Do not change active V6 inputs, manifest, generator deployment or saved traces.
+  Other sources continue. Final release remains gated on this issue and base
+  provenance/terms, complete generation, packing and final GPU validation.
+
+## Historical checkpoint — 2026-09-07 22:52 EDT — ninth source complete, audit running
 
 - Generator **ap-NT9cm8Mc78qaGB9euDnK99**, call
   **fc-01M1ZB04K1DJ94V1PGWTGC9224**, remains active with one container.
