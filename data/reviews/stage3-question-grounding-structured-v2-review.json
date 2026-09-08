@@ -1,0 +1,49 @@
+{
+  "status": "calibration_failed",
+  "version": "question-conditioned-structured-whole-answer-v2",
+  "reviewed_at": "2026-09-08T10:28:02Z",
+  "input_rows_sha256": "43322d45243b9fb70e1f4a677ced674cb00ee9f903072ed85941917674cb9a62",
+  "input_manifest_sha256": "eeb16a3b90632811da51d249d631be9c1dfa9c20702526dcc3a26121b6c6e36a",
+  "decisions_sha256": "035bb1dc16484ff319908f520298daaf117db54b21709bae791d5e31b90bdbac",
+  "rows": 88,
+  "kept": 61,
+  "non_error_rejections": 22,
+  "errors": 5,
+  "error_types": {"inconsistent_checks_and_issue": 4, "length_truncated_whitespace_loop": 1},
+  "reported_control_matches": 6,
+  "controls_total": 8,
+  "negative_controls_with_semantic_failure_detected": 0,
+  "negative_controls_total": 4,
+  "approved_for_full_source_review": false,
+  "approved_for_release": false,
+  "training_rows_modified": false,
+  "findings": [
+    {
+      "task_id": "rea3-d3c8423a899103393b8cbf4f",
+      "result": "false_accept",
+      "evidence": "Question requests shares exercised as of December 31, 2018. The primary table opens at December 31, 2018 with 4,674, then lists exercised (842), canceled (130), and closes December 31, 2019 with 3,702. The movement is during 2019. Reviewer kept 842 and marked period=true while quoting only the exercised row, without the governing dates."
+    },
+    {
+      "task_id": "rea4-md2d-873fbe82c90af128e0f9775e",
+      "result": "false_accept",
+      "evidence": "Candidate says vehicles exceeding 12 feet width, 80 feet length, 14 feet height. Source says width exceeds 12, length 80 or greater, height 14 or greater. Reviewer quoted the exact source bounds but marked boundary=true; quote presence did not validate the answer's inclusive/exclusive relation."
+    },
+    {
+      "task_id": "rea3-056c5e1e18febd81c7a339de",
+      "result": "accidental_negative_match",
+      "evidence": "Final keep=false only because the supplied quotation is not in its claimed seg_6. All seven checks, including scope, were true. Quote text comes from the intervening-event branch in seg_1, while the task asks superior-offer standard. This is NOT a correctly recognized semantic defect."
+    },
+    {
+      "task_id": "rea3-220ec59697c604b7dc911004",
+      "result": "accidental_negative_match",
+      "evidence": "Final keep=false only because evidence_quotes is empty. All checks including order were true. Question asks 2018 then 2019; candidate gives 2019 then 2018 by copying table column order. This is NOT a correctly recognized ordering defect."
+    }
+  ],
+  "v1_reproduction_findings": [
+    {"task_id": "rea3-220ec59697c604b7dc911004", "observed_output": "Review JSON followed by FINAL: (334.1, 235.8)", "failure": "JSON Extra data"},
+    {"task_id": "rea3-5f86317aa0ce3d2771688070", "observed_output": "Review JSON followed by FINAL: $82.5 million", "failure": "JSON Extra data"},
+    {"task_id": "rea3-710ae69ef9058cc7e11bf2d9", "observed_output": "FINAL: $3.9 million only", "failure": "JSON Expecting value"}
+  ],
+  "limits": "All 88 decision summaries, all control outcomes, raw outputs for the five errors and four negative controls, and all three V1 probes were inspected. V1 reproduction demonstrates task-format instruction leakage in those three probes, not proof about all 72 original parse failures. Failed calibration blocks scale without needing to approve non-control samples. No new GPU retry was launched.",
+  "next_scope": "Preserve failed diagnostics and original source holds. Any future reviewer redesign must address candidate anchoring and compare source-derived date/order/bound relations, not merely request another all-correct vote. Require unchanged negative controls plus fresh held-out examples before scale. Proceed independently with bookkeeping preparation for the already-calibrated FaithDial/CLAPNQ review; do not publish its partial decisions."
+}

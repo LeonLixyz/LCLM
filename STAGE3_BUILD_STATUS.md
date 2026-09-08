@@ -49,7 +49,67 @@ removed, while retaining its task and final-answer contract.
 Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
 `/data/stage3-build-20260906/validation/` on the data volume.
 
-## Latest checkpoint — 2026-09-08 06:04 EDT — V1 calibration failed; separate structured diagnostic submitted
+## Latest checkpoint — 2026-09-08 06:28 EDT — structured diagnostic failed semantic controls; no new GPU retry
+
+- Main **ap-NT9cm8Mc78qaGB9euDnK99** remains active, unchanged: ACORD at 06:21
+  **51,700 attempts / 44,736 accepted**. FaithDial/CLAPNQ full review
+  **ap-MRs5K5BukSZUvrSm1h2dlv** remains active, unchanged: **5,850 / 8,506**,
+  FaithDial 3,452 kept / 2,370 rejected / 28 errors, CLAPNQ not started. These
+  partial review decisions are not approved release rows. No inference job was
+  started, stopped, resumed, duplicated or redeployed this heartbeat.
+- Structured diagnostic **ap-NMte2RHDyj8JCPCviSTwbf** completed, zero tasks:
+  **88 rows / 61 kept / 22 non-error rejections / 5 errors**. Four errors are
+  valid JSON with false checks but `issue=none`; one hit 2,048 tokens emitting
+  repeated whitespace inside an unfinished quote array. All failed closed.
+  Decisions SHA **035bb1dc16484ff319908f520298daaf117db54b21709bae791d5e31b90bdbac**.
+- Report says **6/8 control outcomes match**, but this overstates semantic
+  reliability. Both false accepts remain: TAT-QA `rea3-d3c8423a899103393b8cbf4f`
+  takes exercised 842 from the 2019 roll-forward for a 2018 question; corrected
+  MD `rea4-md2d-873fbe82c90af128e0f9775e` changes inclusive length/height bounds
+  to strict `exceeding`. Reviewer quotes the source yet marks every check true.
+- The other two negative controls only match accidentally: MAUD scope mismatch
+  is rejected because its quotation is assigned to the wrong segment; TAT-QA
+  reversed-year answer is rejected because quotes are empty. In both cases all
+  semantic checks are true. **Zero of four known negative controls has its
+  semantic defect recognized.** Thus no scale approval, not even for MAUD.
+- Read all 88 decision summaries, all control outcomes, full raw responses for
+  five errors and four negative controls, and all three unconstrained V1 probes.
+  Probes reveal task-format instruction leakage: two emit review JSON followed
+  by `FINAL: ...`; the third emits only `FINAL: $3.9 million`. This diagnoses
+  these reproductions, not all 72 original errors. Raw requests/responses remain
+  diagnostic artifacts, separate from training messages.
+- Saved **data/reviews/stage3-question-grounding-structured-v2-review.json**,
+  uploaded as **question-grounding-structured-v2/manual-review.json**. All source
+  holds, raw bytes, negative labels and active inference protocols are unchanged.
+  Do not launch another same-shaped prompt retry or full review from this failed
+  pilot. A future design needs source-derived scope/date/order/bound relations
+  independently of candidate wording, then explicit comparison and fresh held-out
+  tests, not just another all-correct vote. It is not implemented or authorized
+  for scale by this checkpoint.
+- Added pure **data/grounding_subset_accounting.py** plus **30 tests** preparing
+  for eventual completed FaithDial/CLAPNQ review. It checks complete multi-source
+  decisions/counts/hashes, one disposition per accepted row, original generation
+  rejection accounting, and preserves retained/excluded raw JSONL bytes exactly
+  (including CRLF/order). Review errors have their own ledger disposition. Output
+  is explicitly `candidate_partitioned_unreleased`, never semantic approval.
+  **No filesystem writer, production subset materialization or release-selection
+  integration was added.** No existing dataset or selection gate changed.
+- Final regression **ap-sdD3IdeKdPZE7Ba371ye6R** passed **226 tests** on Modal CPU,
+  including the real 58-row calibration preflight. Initial accounting iteration
+  **ap-y0COhCNznFryAT8Hm2J7KX** passed 221 before five further integrity tests.
+  Saved regression report remains **expansion-repair-regressions.json**.
+- **Next:** inspect active generation/review completion. After the calibrated
+  FaithDial/CLAPNQ full review finishes, validate its saved decisions/report and
+  original source hashes, inspect fresh kept/rejected examples, then implement
+  a separate lossless candidate-subset writer around the new helper. Bind its
+  manifests to protocol/calibration approval and original generation rejection
+  ledgers; audit format and manually review before any selection integration.
+  Never make a partial subset from progress.json. MAUD/TAT-QA/corrected MD require
+  a genuinely better validation approach and remain held. Base provenance/terms
+  still block HF publication; full expansion export/packing and final actual
+  all-component GPU validation remain undone. No final raw/packed HF release.
+
+## Historical checkpoint — 2026-09-08 06:04 EDT — V1 calibration failed; separate structured diagnostic submitted
 
 - Main **ap-NT9cm8Mc78qaGB9euDnK99** remains active, unchanged. Persistent
   ACORD checkpoint at 06:02: **48,700 attempts / 42,165 accepted**. FaithDial/
