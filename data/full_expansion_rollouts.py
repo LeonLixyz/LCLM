@@ -20,11 +20,22 @@ def parse_judge_json(content):
 
 def generate_all(client,model,revision,root,commit,reload=None,concurrency=32,
                  output_root=None,sources=None,pilot_limit=None,strict_semantics=False,
-                 input_provenance=None):
+                 input_provenance=None, teacher_config=None):
     from data.synthetic_expansion_agent import TEACHER_SYSTEM_PROMPT,messages_for_openai_api,run_agent_rollout,verify_trace
     from data.harvest_expansion_trace import harvest_training_messages
     from data.real_expansion_agent import verify_real_trace
     root=Path(root)
+    if teacher_config is not None:
+        from data.qwen38_pilot_sampling import sampling_kwargs
+        expected={'model_id':'Qwen/Qwen3.8-27B',
+                  'revision':'1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0',
+                  'sampling_profile':'recommended'}
+        if teacher_config!=expected or revision!=expected['revision']:
+            raise ValueError('Unrecognized teacher configuration')
+        teacher_sampling=sampling_kwargs('recommended')
+    else:
+        teacher_sampling={'temperature':0,'max_tokens':2048,
+            'extra_body':{'chat_template_kwargs':{'enable_thinking':False}}}
     output_root=Path(output_root) if output_root else root
     output_root.mkdir(parents=True,exist_ok=True)
     root.mkdir(parents=True,exist_ok=True)
@@ -37,6 +48,11 @@ def generate_all(client,model,revision,root,commit,reload=None,concurrency=32,
         'training_harvest':'native-calls-and-explicit-final-v1',
         'training_system_prompt_version':'document-task-v1',
         'pilot_limit':pilot_limit}
+    if teacher_config is not None:
+        manifest.update(model=teacher_config['model_id'],temperature=teacher_sampling['temperature'],
+                        teacher_config=teacher_config,teacher_sampling=teacher_sampling,
+                        judge_model=teacher_config['model_id'],judge_revision=revision,
+                        judge_sampling=teacher_sampling,requires_new_source_review=True)
     # Optional for versioned corrective shards. Omission preserves the exact
     # original V6 manifest, so old checkpoints remain resumable unchanged.
     if input_provenance is not None:
@@ -89,10 +105,15 @@ def generate_all(client,model,revision,root,commit,reload=None,concurrency=32,
             def complete(messages,tools):
                 response=client.chat.completions.create(model=model,
                     messages=messages_for_openai_api(messages),tools=list(tools) if tools else None,
-                    tool_choice='auto' if tools else None,temperature=0,max_tokens=2048,
-                    extra_body={'chat_template_kwargs':{'enable_thinking':False}})
+                    tool_choice='auto' if tools else None,**teacher_sampling)
                 m=response.choices[0].message
-                return {'content':m.content or '', 'tool_calls':[c.model_dump() for c in (m.tool_calls or [])]}
+                content=m.content or ''
+                if teacher_config is not None:
+                    from data.clean_agent_trajectories import strip_cot
+                    if response.choices[0].finish_reason=='length':
+                        raise ValueError('Truncated model response')
+                    content=strip_cot(content)
+                return {'content':content, 'tool_calls':[c.model_dump() for c in (m.tool_calls or [])]}
             try:
                 trace=run_agent_rollout(task,complete,max_tool_calls=16)
                 if not trace.get('rollout_failure_reason'):
@@ -104,8 +125,9 @@ def generate_all(client,model,revision,root,commit,reload=None,concurrency=32,
                     if strict_semantics:
                         from data.expansion_semantic_review import apply_semantic_review
                         def judge(messages):
-                            response=client.chat.completions.create(model=model,temperature=0,max_tokens=2048,messages=messages,
-                                extra_body={'chat_template_kwargs':{'enable_thinking':False}})
+                            response=client.chat.completions.create(model=model,messages=messages,**teacher_sampling)
+                            if teacher_config is not None and response.choices[0].finish_reason=='length':
+                                raise ValueError('Truncated judge response')
                             return response.choices[0].message.content
                         trace['verification']=apply_semantic_review(source,trace,judge)
                     elif source in {'clapnq','faithdial','multidoc2dial','watsonx_docs_qa','billsum'} and (
@@ -125,11 +147,20 @@ def generate_all(client,model,revision,root,commit,reload=None,concurrency=32,
                             'reason':'accepted:qwen_judge' if accepted else 'wrong_answer:qwen_judge','judge':judgment}
                 trace.update(source_dataset=task.get('source_dataset',trace['source_dataset']),
                     source_row_id=task.get('source_row_id',str(task.get('index'))),model=manifest['model'],model_revision=revision,
-                    generation={'teacher_prompt_saved_in_training_messages':False,'temperature':0,'max_tokens_per_turn':2048})
+                    generation={'teacher_prompt_saved_in_training_messages':False,
+                                'temperature':teacher_sampling['temperature'],'max_tokens_per_turn':2048})
+                if teacher_config is not None:
+                    trace['generation'].update(enable_thinking=False,teacher_config=teacher_config,
+                                               requires_new_source_review=True)
                 return trace
             except Exception as exc:
-                return {**(trace or {}),'task_id':task['task_id'],'source_dataset':task.get('source_dataset','synthetic'),
+                failed={**(trace or {}),'task_id':task['task_id'],'source_dataset':task.get('source_dataset','synthetic'),
                     'verification':{'accepted':False,'reason':f'generation_exception:{type(exc).__name__}'},'error':str(exc)}
+                if teacher_config is not None:
+                    failed.update(model=manifest['model'],model_revision=revision,
+                                  generation={'enable_thinking':False,'teacher_config':teacher_config,
+                                              'requires_new_source_review':True})
+                return failed
         processed=0;start=time.time()
         with task_path.open() as tasks,accepted.open('a') as out,rejected.open('a') as bad,ThreadPoolExecutor(max_workers=concurrency) as executor:
             pending=set()

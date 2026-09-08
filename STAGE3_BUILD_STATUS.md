@@ -49,7 +49,59 @@ removed, while retaining its task and final-answer contract.
 Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
 `/data/stage3-build-20260906/validation/` on the data volume.
 
-## Latest checkpoint — 2026-09-08 14:32 EDT — generation advancing; DFlash research only
+## Latest user request — 2026-09-08 — switch remaining generation to Qwen3.8-27B
+
+- **15:03 EDT continuation:** CPU preparation completed successfully. Immutable
+  transition manifest SHA256:
+  **e17e4cd479c2028097dd400587e94e2235616a04ca2ffb917a65cd02dbd0a054**.
+  Exact remaining tasks: **BillSum 10,749; LexGLUE 186,444; synthetic 10,000**,
+  total **207,193**. Durable old BillSum audit: **8,200 attempts / 418 accepted**.
+  All 12 completed main-source reports plus BillSum checkpoint sum to
+  **167,562 attempted / 97,677 automatically accepted / 69,885 rejected**.
+  Corrected MultiDoc2Dial is a replacement, not additional unique task coverage.
+- Expanded switch suite **60 passed** on Modal CPU app
+  **ap-pNvaYmBehi7lyHrmdWubfk**, including actual pinned teacher/training template
+  rendering. No data modified by this test-only run.
+- Deployed app **ap-YmR7F3swMDGwPkxPyx9uGx** and submitted generation exactly once:
+  **fc-01M216DEKJDPYYC5PW1C8881N6**. Initial call graph **PENDING**;
+  inspect this existing call/output before any resubmission or redeployment.
+  Old235B app now has zero tasks. New job uses H200:8, nonthinking27B,
+  no DFlash; generation and source quality review are still incomplete.
+- **User explicitly chose27B for speed. Do not restart235B generation.**
+  Earlier pilot/research notes below are historical, not a prohibition on this
+  newly authorized teacher change. Source quality/provenance release holds remain.
+- Old call **fc-01M1ZB04K1DJ94V1PGWTGC9224** cancelled with container termination
+  at14:44 EDT; call graph confirms **TERMINATED**. App task count can lag cleanup.
+  Saved **full-20260906-v6/** records preserved untouched. Last progress checkpoint
+  was BillSum8,200/418; exact durable counts come from transition audit, not this
+  potentially lagging progress counter. Uncommitted work may be retried.
+- New **data.generate_qwen38_remaining_modal**, app
+  **lclm-qwen38-27b-remaining-v1**. CPU prep **ap-xZZAP7HptURsxMXdDUSp2w** completed.
+  Remaining task folder
+  **remaining-qwen38-27b-v1-tasks/** and output **remaining-qwen38-27b-v1/** under
+  **/data/stage3-agent/real-expansion/pilots/**. BillSum/LexGLUE/synthetic only;
+  accepted AND rejected prior IDs excluded. No prior teacher records rewritten.
+  This is a delta, not a complete replacement for the15-source dataset. Final
+  composition must combine old235B records, new27B records, correctedMD replacement
+  and reviewed exclusions with exact disjoint accounting. Existing release selector
+  intentionally still blocks publication until this composition is implemented.
+- Added pinned teacher configuration to shared rollout code; legacy235B default
+  manifest unchanged.27B uses recommended nonthinking sampling, native qwen3_coder
+  tool parser, truncation rejection and CoT harvesting. Same semantic-check logic
+  uses27B as reviewer for remaining free-form tasks; explicitly recorded in manifest
+  and **requires_new_source_review=true**. No automatic release approval/DFlash.
+- CPU tests **ap-jVcdfE8IrxojNyoEsDGVfL**: **55 passed**, with actual pinned template
+  rendering. Teacher template SHA **c3cf9e34abf4f9e36c2d72165aa9c132d3e2a725b6c2586aaa3a8af9d7a81041**
+  inserts **<think>\\n\\n</think>\\n\\n** in nonthinking generation prefix AND its
+  own conversation rendering. This is internal teacher formatting, not sampled CoT.
+  Training template SHA **64f85b198065d0fba2a81f37e10ed68161ce2c19a754c7100e67e0ca2ee9c326**
+  inserts no think placeholder in either tested rendering. Never pack27B-rendered
+  teacher strings; save cleaned messages and use the pinned4B training template.
+- Five additional teacher-manifest/revision/parent-file guards added after the
+  original55-test run; expanded60-test suite passed before GPU submission.
+  Source/teacher/judge metadata must remain separated from training.
+
+## Previous checkpoint — 2026-09-08 14:32 EDT — generation advancing; DFlash research only
 
 - Main app **ap-NT9cm8Mc78qaGB9euDnK99** remains active with one task; 27B
   pilot remains idle. BillSum **8,000 attempted / 405 accepted**: 6,008 semantic,
