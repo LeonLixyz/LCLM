@@ -5,6 +5,10 @@
   "scope": "Manual evidence review of two deterministic full-run samples; not a complete semantic audit or release approval",
   "accepted_file_sha256": "6a343b031681dec6f2e1140cf39cb1eb92e0a13b7df3de16275645111a39d44f",
   "upstream_revision": "1108a969d076f04c7367f0c2427d1c5d6d6bdaa0",
+  "pinned_builder_encoding_verified": true,
+  "pinned_builder_url": "https://huggingface.co/datasets/IBM/multidoc2dial/raw/1108a969d076f04c7367f0c2427d1c5d6d6bdaa0/multidoc2dial.py",
+  "corrective_renderer": "data/multidoc2dial_dialogue.py",
+  "corrective_build_app": "ap-HRWYfPYjEEJB22AjYPwgDM",
   "sample_artifact": "/data/stage3-build-20260906/full-expansion-manual-review-samples/multidoc2dial.json",
   "reviewed_examples": [
     {
@@ -22,8 +26,8 @@
   ],
   "cause": "Upstream question encoding is current utterance + [SEP] + reverse-ordered prior turns joined with ||. full_expansion_tasks.py only replaces [SEP] with a newline; it does not decode/render the history.",
   "required_followup": [
-    "Verify the question encoding against the pinned upstream builder and raw dialogue rows.",
-    "Implement and test chronological history rendering with explicit current-request boundaries, preserving every utterance and source document.",
+    "Pinned upstream encoding verified; finish the full raw-dialogue roundtrip build and inspect corrected previews.",
+    "Five renderer tests passed on Modal; confirm the versioned shard preserves full source coverage, documents and answers.",
     "Prepare a versioned source-specific corrective pilot and regenerate/revalidate this source as needed. Do not mutate the live V6 input or accepted files, or silently rewrite saved prompts after generation.",
     "Keep original V6 MultiDoc2Dial files as diagnostics until a reviewed replacement is available; final publication must not approve this unresolved review.",
     "Other source generation can continue unchanged."

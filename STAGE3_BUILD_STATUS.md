@@ -49,7 +49,32 @@ removed, while retaining its task and final-answer contract.
 Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
 `/data/stage3-build-20260906/validation/` on the data volume.
 
-## Latest checkpoint — 2026-09-07 23:28 EDT — ninth format audit passed; manual prompt issue found
+## Latest checkpoint — 2026-09-07 23:56 EDT — versioned dialogue repair being prepared
+
+- Main generator **ap-NT9cm8Mc78qaGB9euDnK99**, call
+  **fc-01M1ZB04K1DJ94V1PGWTGC9224**, still active. FaithDial latest inspected
+  checkpoint: **9,300 attempts / 3,953 accepted**. Combined with nine completed
+  sources: **91,731 attempts / 42,481 accepted**, before final source reviews.
+- Verified the reversed-history encoding in the **pinned** IBM dataset builder
+  at revision `1108a969d076f04c7367f0c2427d1c5d6d6bdaa0`, not just main.
+- Added `data/multidoc2dial_dialogue.py`: reconstructs questions using raw
+  dialogue IDs/turn IDs rather than splitting arbitrary utterance text on ||.
+  It verifies exact upstream MRC encoding and next-agent reference before
+  rendering chronological history and an explicit current-request section.
+  Five tests passed on Modal (including literal delimiters, first/columnar turns
+  and mismatched question/reference/turn IDs).
+- Corrected-source CPU build **ap-HRWYfPYjEEJB22AjYPwgDM** is running via
+  `data/prepare_multidoc2dial_repair_modal.py`. Target directory:
+  `/data/stage3-agent/real-expansion/pilots/multidoc2dial-chronological-v1-inputs`.
+  Expected 21,451 tasks; new versioned IDs with parent IDs, original document
+  bodies/segment IDs/support/answers unchanged. Wait for `multidoc2dial.build.json`
+  and inspect `preview-questions.json` before claiming full build success.
+- This does **not** change the active V6 files or deployed generator. Next gate:
+  separate corrected-prompt Qwen235B pilot, answer/format review, then versioned
+  full-source regeneration and release integration. Old V6 MultiDoc2Dial remains
+  release-held; no pilot/full repair generation has been launched yet.
+
+## Historical checkpoint — 2026-09-07 23:28 EDT — ninth format audit passed; manual prompt issue found
 
 - Generator **ap-NT9cm8Mc78qaGB9euDnK99**, call
   **fc-01M1ZB04K1DJ94V1PGWTGC9224**, remains healthy. FaithDial checkpoint:
