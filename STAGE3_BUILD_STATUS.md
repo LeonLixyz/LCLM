@@ -49,7 +49,33 @@ removed, while retaining its task and final-answer contract.
 Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
 `/data/stage3-build-20260906/validation/` on the data volume.
 
-## Latest checkpoint — 2026-09-08 08:00 EDT — BillSum partial diagnostic; generation unchanged
+## Latest checkpoint — 2026-09-08 08:25 EDT — contiguous quotation diagnostic tested
+
+- Main **ap-NT9cm8Mc78qaGB9euDnK99** remains deployed, one active task.
+  BillSum committed checkpoint: **1,300 attempts / 71 accepted**; rejects
+  **1,008 semantic, 211 JSONDecodeError, 5 missing support, 2 unknown segment,
+  2 ValueError, 1 invalid segment ID**. No restart or new GPU inference.
+- Added **data/billsum_quote_diagnostic.py**, a read-only helper for future
+  verifier work. It validates task identity and exact prepared tool bodies,
+  excludes distractors/padding/unexpanded chunks, and joins only consecutive
+  primary parts in source order, never across gaps or documents. It cannot
+  approve or rewrite a row and is not imported by the active generation code.
+- CPU **ap-cp7sbHZEb3fTVeXxt1tTYJ** completed: **21 tests passed**, then replayed
+  the two saved claim-bearing diagnostic samples against the original prepared
+  BillSum tasks. Prepared file SHA
+  **6215a557b4ec8c791c8aab0676ab978e2a840f9eb26cc0f7652e78d51e86744d**;
+  samples SHA **6ab454a34fbfd799dd2341717e8f81bf8e90dd91e6748dd11594e5a67689fb92**.
+- Replay confirms the contractor-summary sentence-2 quote matches contiguous
+  primary text after removing the boundary header. All other saved quotation
+  flags agree on these two samples. **Two unsupported sentence votes remain**
+  on that rejected row: fixing quote presence alone does not justify recovery.
+  Accepted education-bill control is unchanged. No saved vote changed.
+  Report: prior snapshot directory's **contiguous-quote-diagnostic-v1.json**.
+- This is bounded mechanical validation, not a new judge calibration or a
+  completed-source audit. Continue existing generation; all source holds,
+  pending user choices, provenance gates and final packing/release work remain.
+
+## Historical checkpoint — 2026-09-08 08:00 EDT — BillSum partial diagnostic; generation unchanged
 
 - Main **ap-NT9cm8Mc78qaGB9euDnK99** remains deployed with one active task.
   No GPU restart, model change, or verifier change. BillSum snapshot has
