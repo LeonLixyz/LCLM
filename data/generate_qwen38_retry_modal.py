@@ -81,6 +81,10 @@ def generate():
     manifest = json.loads(path.read_text())
     if manifest['teacher_config']!=CONFIG or manifest['user_authorized_retry'] is not True:
         raise ValueError('Missing retry authorization')
+    # Latest user clarification:235B first pass,27B failures only. The combined
+    # CPU preparation is useful for accounting but is NOT a27B generation route.
+    if any(r['counts'].get('previously_unattempted',0) for r in manifest['sources']):
+        raise ValueError('Split routes first: unattempted tasks require235B, not27B')
     # Fail before model startup if either the parent or selected tasks changed.
     for report in manifest['sources']:
         validate_prepared(report,TASKS)

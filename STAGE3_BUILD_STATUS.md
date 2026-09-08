@@ -49,7 +49,24 @@ removed, while retaining its task and final-answer contract.
 Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
 `/data/stage3-build-20260906/validation/` on the data volume.
 
-## Latest user request — 2026-09-08 — retry rejected/failed tasks with 27B
+## Latest user routing clarification — 2026-09-08 — 235B first pass, 27B failures only
+
+- **Overrides the earlier27B-for-remaining authorization below.** User clarified:
+  all tasks receive235B first pass; rejected/failed tasks then receive27B retry.
+  Preserve completed235B attempts. Remaining unattempted tasks go to235B, NOT27B.
+  Do not rerun accepted235B tasks. New235B failures join the27B retry queue.
+- **Do NOT launch `data.generate_qwen38_retry_modal.generate`**: its current
+  prepared v2 input mixes rejected and unattempted tasks, so it does not match
+  the latest routing. No v2 GPU call has been submitted. CPU prep may finish;
+  its explicit per-row `attempt_provenance.kind` and counts support separating
+  the two routes without modifying prior data. Need separate route manifests,
+  checkpoint guards, output directories and teacher/judge provenance before launch.
+- Existing235B/v1-27B jobs were idle/failed, not running, at last inspection.
+  The235B remaining route must use fresh BillSum checkpoint audit, NOT stale
+  remaining-v1 hashes.27B retry route must use corrected MultiDoc2Dial parents.
+  All validation/grounding/source-license/release holds remain unchanged.
+
+## Previous user request — 2026-09-08 — retry rejected/failed tasks with 27B
 
 - User explicitly requested one new27B attempt for rejected/failed traces in
   addition to already authorized unattempted tasks. Keep prior candidates intact;
