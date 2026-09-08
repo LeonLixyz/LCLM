@@ -49,7 +49,42 @@ removed, while retaining its task and final-answer contract.
 Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
 `/data/stage3-build-20260906/validation/` on the data volume.
 
-## Latest checkpoint — 2026-09-07 23:58 EDT — versioned dialogue repair inputs ready
+## Latest checkpoint — 2026-09-08 00:29 EDT — corrective pilot submitted; regressions passed
+
+- Main generator **ap-NT9cm8Mc78qaGB9euDnK99**, call
+  **fc-01M1ZB04K1DJ94V1PGWTGC9224**, remains active and unchanged. Latest
+  FaithDial checkpoint: **13,600 attempts / 5,889 accepted**. Combined main-run
+  checkpoint: **96,031 attempts / 44,417 accepted**, not release-approved counts.
+- Deployed isolated **32-task** corrective pilot app
+  **ap-BWrkXeukNZoYoArprKQaOe** (`lclm-md2d-corrective-pilot-v1`) and spawned
+  **fc-01M1ZM40P93D2WPDXNVD8BDPSZ**. Model weights are loading on a separate
+  H200:8 container. **Do not duplicate/redeploy either active generator.**
+  New module: `data/generate_multidoc2dial_repair_modal.py`; no full-run option
+  is exposed. Same pinned Qwen235B, no thinking, 32-task reservoir, dual semantic
+  checks, original documents and tools. Two-hour function bound, scale-to-zero.
+  Pilot output: `/data/stage3-agent/real-expansion/pilots/multidoc2dial-chronological-v1-pilot`.
+- Optional `input_provenance` now binds corrected task SHA/source/rendering
+  version in its generation manifest; omission preserves exact original V6
+  manifests. No redeploy of the main service. Audit and manual sampler CLIs now
+  accept `--generation-dir` for separate corrective outputs, storing reports
+  beneath that directory instead of overwriting baseline source audits.
+- Regression app **ap-C0ZTZ7WEtmPRLfPJbrjegF**: **29 tests passed**. Initial
+  run caught Modal's symlinked volume-root path comparison; corrected both sides
+  before rerun. Report `/data/stage3-build-20260906/expansion-repair-regressions.json`.
+- After pilot completion: audit with `data.audit_full_expansion_modal --sources
+  multidoc2dial --generation-dir <pilot-output>`; sample via
+  `data.sample_full_expansion_review_modal --source multidoc2dial --generation-dir
+  <pilot-output>`, then manual review before full corrected-source regeneration.
+  Corrective counts must remain separate from main V6 counts until reviewed
+  replacement integration. Base provenance/terms and final release gates remain.
+- FinQA manual sample app **ap-5vZQUn7LXPX9n29sXvTr1m** completed; both hash-
+  selected single/multi samples reviewed against full expanded evidence and
+  independently checked arithmetic. Recorded in `data/reviews/stage3-full-finqa-review.json`.
+  Both sample answers pass; this is not all-row correctness/release approval.
+  Noted conservative support coverage can require unnecessary extra expansion:
+  multi-expansion counts must not be described as necessarily multi-hop tasks.
+
+## Historical checkpoint — 2026-09-07 23:58 EDT — versioned dialogue repair inputs ready
 
 - Main generator **ap-NT9cm8Mc78qaGB9euDnK99**, call
   **fc-01M1ZB04K1DJ94V1PGWTGC9224**, still active. FaithDial latest inspected

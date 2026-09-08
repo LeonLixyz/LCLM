@@ -9,22 +9,23 @@ import json
 
 import modal
 
-from data.audit_full_expansion_modal import AUDITS, GENERATED
+from data.audit_full_expansion_modal import audit_paths
 from data.stage3_full_modal import ROOT, image, volume
 
 app = modal.App("lclm-full-expansion-review-samples")
 
 
 @app.function(image=image, cpu=2, memory=8192, timeout=1800, volumes={"/data": volume})
-def sample(source: str):
+def sample(source: str, generation_dir: str = ''):
     from data.build_full_expansion_tasks_modal import SOURCES
     if source not in SOURCES:
         raise ValueError("Unknown source")
-    audit = json.loads((AUDITS / f"{source}.json").read_text())
+    generated, audits = audit_paths(generation_dir)
+    audit = json.loads((audits / f"{source}.json").read_text())
     if audit["status"] != "passed":
         raise ValueError("Full source format audit must pass first")
     selected = {}; digest = hashlib.sha256(); count = 0
-    with (GENERATED / f"{source}.accepted.jsonl").open("rb") as stream:
+    with (generated / f"{source}.accepted.jsonl").open("rb") as stream:
         for line in stream:
             digest.update(line); row = json.loads(line); count += 1
             segments = {c["function"]["arguments"]["segment_id"]
@@ -41,7 +42,8 @@ def sample(source: str):
                 "source": source, "accepted_file_sha256": digest.hexdigest(),
                 "selection": "lowest SHA256(final-review-v1:task_id) per single/multi bucket",
                 "examples": examples}
-    destination = ROOT / "full-expansion-manual-review-samples"
+    destination = (generated / "manual-review-samples" if generation_dir
+                   else ROOT / "full-expansion-manual-review-samples")
     destination.mkdir(exist_ok=True)
     (destination / f"{source}.json").write_text(json.dumps(artifact, ensure_ascii=False, indent=2))
     views = [{"category": x["category"], "task_id": x["training_row"]["task_id"],
@@ -58,5 +60,5 @@ def sample(source: str):
 
 
 @app.local_entrypoint()
-def main(source: str):
-    print(json.dumps(sample.remote(source), indent=2))
+def main(source: str, generation_dir: str = ''):
+    print(json.dumps(sample.remote(source, generation_dir), indent=2))

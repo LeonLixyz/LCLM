@@ -19,7 +19,8 @@ def parse_judge_json(content):
     return value
 
 def generate_all(client,model,revision,root,commit,reload=None,concurrency=32,
-                 output_root=None,sources=None,pilot_limit=None,strict_semantics=False):
+                 output_root=None,sources=None,pilot_limit=None,strict_semantics=False,
+                 input_provenance=None):
     from data.synthetic_expansion_agent import TEACHER_SYSTEM_PROMPT,messages_for_openai_api,run_agent_rollout,verify_trace
     from data.harvest_expansion_trace import harvest_training_messages
     from data.real_expansion_agent import verify_real_trace
@@ -36,6 +37,10 @@ def generate_all(client,model,revision,root,commit,reload=None,concurrency=32,
         'training_harvest':'native-calls-and-explicit-final-v1',
         'training_system_prompt_version':'document-task-v1',
         'pilot_limit':pilot_limit}
+    # Optional for versioned corrective shards. Omission preserves the exact
+    # original V6 manifest, so old checkpoints remain resumable unchanged.
+    if input_provenance is not None:
+        manifest['input_provenance']=json.loads(json.dumps(input_provenance,sort_keys=True))
     if strict_semantics:
         from data.expansion_semantic_review import REVIEW_VERSION, CLAIM_REVIEW_VERSION
         from data.pubmedqa_split import training_ids

@@ -8,9 +8,19 @@ app = modal.App('lclm-full-expansion-format-audit')
 GENERATED = Path('/data/stage3-agent/real-expansion/pilots/full-20260906-v6')
 AUDITS = ROOT / 'full-expansion-format-audit'
 
+def audit_paths(generation_dir=''):
+    if not generation_dir:
+        return GENERATED, AUDITS
+    requested = Path(generation_dir)
+    generated = requested.resolve()
+    original = GENERATED.resolve()  # Modal volume mount paths can be symlinks.
+    if generated.parent != original.parent or generated == original:
+        raise ValueError('Corrective audit must use a separate versioned pilots directory')
+    return requested, requested / 'format-audit'
+
 @app.function(image=image, cpu=8, memory=32768, timeout=86400, max_containers=4,
               volumes={'/data':volume})
-def audit_source(source:str):
+def audit_source(source:str, generation_dir:str=''):
     import hashlib
     import multiprocessing as mp
     from collections import Counter
@@ -20,19 +30,20 @@ def audit_source(source:str):
     from data.stage3_tokenizers import DECODER_REVISION, ENCODER_REVISION
     if source not in SOURCES:
         raise ValueError('Unknown source')
-    report_path = GENERATED / f'{source}.generation.json'
+    generated, audits = audit_paths(generation_dir)
+    report_path = generated / f'{source}.generation.json'
     generation = json.loads(report_path.read_text())
     if generation.get('status') != 'complete':
         raise ValueError('Source generation is incomplete')
     expected = sum(v for k,v in generation['reasons'].items() if k.startswith('accepted'))
-    manifest_digest = hashlib.sha256((GENERATED/'generation-manifest.json').read_bytes()).hexdigest()
+    manifest_digest = hashlib.sha256((generated/'generation-manifest.json').read_bytes()).hexdigest()
     allowed = None
     if source == 'pubmedqa_labeled':
         from data.pubmedqa_split import training_ids
         allowed = training_ids(json.loads(Path('/data/stage3-agent/real-expansion/sources/pubmedqa_labeled/official-splits/split-manifest.json').read_text()))
-    AUDITS.mkdir(parents=True,exist_ok=True)
+    audits.mkdir(parents=True,exist_ok=True)
     digest = hashlib.sha256(); counts = Counter(); errors = []; failed = 0; minimum = None; seen = set()
-    path = GENERATED / f'{source}.accepted.jsonl'
+    path = generated / f'{source}.accepted.jsonl'
     with path.open('rb') as stream, ProcessPoolExecutor(max_workers=8,
             mp_context=mp.get_context('spawn'), initializer=init_worker) as pool:
         pending = set()
@@ -66,12 +77,13 @@ def audit_source(source:str):
         'generation_manifest_file_sha256':manifest_digest,
         'decoder_tokenizer_revision':DECODER_REVISION, 'encoder_tokenizer_revision':ENCODER_REVISION,
         'scope':'Every accepted row: native tools, exact expansion, segment length, saved prompt, source verifier, independent assistant-only labels. Semantic votes remain heuristic.'}
-    (AUDITS/f'{source}.json').write_text(json.dumps(result,indent=2)); volume.commit()
+    (audits/f'{source}.json').write_text(json.dumps(result,indent=2)); volume.commit()
     return result
 
 @app.local_entrypoint()
-def main(sources:str):
+def main(sources:str, generation_dir:str=''):
     selected=sources.split(',')
     if len(set(selected))!=len(selected):raise ValueError('Duplicate audit sources')
-    for report in audit_source.map(selected):
+    audit_paths(generation_dir)
+    for report in audit_source.map(selected,kwargs={'generation_dir':generation_dir}):
         print(json.dumps(report,indent=2))
