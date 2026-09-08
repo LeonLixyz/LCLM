@@ -49,7 +49,37 @@ removed, while retaining its task and final-answer contract.
 Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
 `/data/stage3-build-20260906/validation/` on the data volume.
 
-## Latest checkpoint — 2026-09-08 13:05 EDT — bounded official-sampling follow-up running
+## Latest checkpoint — 2026-09-08 13:35 EDT — official-sampling pilot reviewed
+
+- Recommended-profile call **fc-01M20ZMD4JGNM7HFSXE7Q3FGD6** completed all24,
+  pilot app **ap-RDviKBVxZhjVzB03yrkvaR** now idle. No rerun or production switch.
+  Results SHA **284ef6b8ddc6f70f4650ec99ccdb7de933e24495902b79be77edbe81d4f4894d**,
+  frozen input SHA unchanged. All 24 raw-response file hashes checked.
+- Recommended sampling produced **20 cleanly harvested diagnostic traces** vs
+  v1's18: **2 duplicate-FINAL failures, 2 trailing-explanation failures, no
+  truncations**. Three format recoveries and one new failure. Not20 approved
+  rows, and one selected stochastic trial is not a model-quality benchmark.
+- **56/56 API requests nonthinking**, no reasoning fields/think tags observed;
+  **35 valid native expand calls**, exact tool bodies, four repeated expansions.
+  All20 saved system/user messages equal prepared training messages; intermediate
+  assistant prose/reasoning fields absent. Harvesting removed3,084 characters
+  including untagged explanation preambles; ambiguous boundaries still rejected.
+- Source review again finds correct verbose answers rejected by strict matching
+  and all-document support requirements. BillSum scope/procedure wording remains
+  loose. ContractNLI limited-right exception changes27B's label to contradict;
+  matches literal source-scope concern but disagrees with upstream entail label.
+  Do not override references or call label disagreement a definite regression.
+- Full review: **data/reviews/stage3-qwen38-27b-recommended-review.json**;
+  also saved as v2 output **manual-paired-review.json** on Modal. Stop repetitive
+  teacher pilots here; no evidence yet to switch production. All release holds
+  remain. Next meaningful work is completed-source audit/review and validated
+  verifier/source-scope corrections, not permissive acceptance-rate tuning.
+- Main **ap-NT9cm8Mc78qaGB9euDnK99** still has one active task. BillSum checkpoint
+  **7,000 attempted / 347 accepted**: 5,229 semantic, 1,387 JSONDecodeError,
+  18 missing support, 15 ValueError, 3 unknown-segment, 1 invalid-segment reject.
+  BillSum not complete; LexGLUE/synthetic completion still pending.
+
+## Previous checkpoint — 2026-09-08 13:05 EDT — bounded official-sampling follow-up running
 
 - Checked existing jobs and persistent reports first: original 27B pilot complete
   and idle, main 235B still active. Main BillSum **6,400 attempts / 318 accepted**
