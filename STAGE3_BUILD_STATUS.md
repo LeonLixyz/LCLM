@@ -49,7 +49,36 @@ removed, while retaining its task and final-answer contract.
 Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
 `/data/stage3-build-20260906/validation/` on the data volume.
 
-## Latest checkpoint — 2026-09-08 08:25 EDT — contiguous quotation diagnostic tested
+## Latest user request — 2026-09-08 11:40 EDT — acceptance breakdown and larger-Qwen pilot
+
+- Re-read all 12 completed main-source generation reports plus BillSum checkpoint
+  **4,900 attempts / 231 accepted**. Main totals **164,262 attempted / 97,490
+  automatically accepted (59.35%)**. These include held source candidates and
+  old MD; do not add the separate 16,158 corrected MD candidates to this total.
+  Seven source sample-reviewed pools total **59,579**, not full release approval.
+- User asks whether low yield is model quality and to try the larger Modal Qwen
+  with DFlash, non-thinking and reasoning stripped. Official sources confirm
+  Modal Shared Endpoints offer **Qwen3.8-2.4T-A95B with custom DFlash**, but both
+  Qwen's model card and Modal Library explicitly say **thinking cannot be
+  disabled**; efforts supported are low/medium/xhigh. Stripping the entire
+  reasoning content from saved training traces is possible, but not equivalent
+  to non-thinking generation. Ask whether low-effort generation with all
+  reasoning removed is acceptable before launching a pilot under that setting.
+- Model sources checked: https://huggingface.co/Qwen/Qwen3.8-2.4T-A95B and
+  https://modal.com/blog/qwen3-8-2-4t-a95b-now-available-on-modal and
+  https://modal.com/library/qwen/qwen3-8-max . Shared rates shown: $2/MTok input,
+  $0.25 cached input, $6 output. Existing conda Modal CLI has no `endpoint`
+  command; use documented dashboard flow or isolated newer SDK if proceeding,
+  not an in-place upgrade that could affect existing jobs. No endpoint created
+  and no larger-model inference has run. Existing 235B generation unchanged.
+- Acceptance is structural rules for all traces, source-specific exact/numeric/
+  label checks for fixed-answer tasks, and same-235B dual LLM correctness and
+  grounding votes for free-form tasks (PubMed additionally requires correct
+  decision). BillSum also requires each sentence's supported vote and exact
+  quote presence. Manual checks found false accepts, while diagnostics found
+  false rejects/parser failures. Raw acceptance is not a model accuracy estimate.
+
+## Previous checkpoint — 2026-09-08 08:25 EDT — contiguous quotation diagnostic tested
 
 - **11:22 EDT monitoring check:** same main app remains active with one task.
   BillSum **4,600 attempts / 211 accepted**, with **3,456 semantic rejects,
