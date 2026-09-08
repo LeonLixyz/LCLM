@@ -49,7 +49,7 @@ removed, while retaining its task and final-answer contract.
 Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
 `/data/stage3-build-20260906/validation/` on the data volume.
 
-## Latest checkpoint — 2026-09-07 23:56 EDT — versioned dialogue repair being prepared
+## Latest checkpoint — 2026-09-07 23:58 EDT — versioned dialogue repair inputs ready
 
 - Main generator **ap-NT9cm8Mc78qaGB9euDnK99**, call
   **fc-01M1ZB04K1DJ94V1PGWTGC9224**, still active. FaithDial latest inspected
@@ -63,12 +63,17 @@ Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
   rendering chronological history and an explicit current-request section.
   Five tests passed on Modal (including literal delimiters, first/columnar turns
   and mismatched question/reference/turn IDs).
-- Corrected-source CPU build **ap-HRWYfPYjEEJB22AjYPwgDM** is running via
+- Corrected-source CPU build **ap-HRWYfPYjEEJB22AjYPwgDM** completed via
   `data/prepare_multidoc2dial_repair_modal.py`. Target directory:
   `/data/stage3-agent/real-expansion/pilots/multidoc2dial-chronological-v1-inputs`.
-  Expected 21,451 tasks; new versioned IDs with parent IDs, original document
-  bodies/segment IDs/support/answers unchanged. Wait for `multidoc2dial.build.json`
-  and inspect `preview-questions.json` before claiming full build success.
+  **All 21,451 tasks** roundtrip-validated against raw dialogues; new versioned
+  IDs with parent IDs, original document bodies/segment IDs/support/answers
+  unchanged. `multidoc2dial.build.json` saved with approved false, tasks SHA256
+  **ed8c72b55cd790cdc009b60e59088174ba8dfd35fb9f4d76d594379e1b005649**,
+  parent task SHA256 **3bcbf4e63cc096983319e958391e1745831ff7a56eb118db8fcc9084b9f82473**.
+  Inspected all three `preview-questions.json` examples: no-history, two-history-
+  turn and four-history-turn cases render chronological history and current
+  request separately; expected next answers are not inserted in the prompt.
 - This does **not** change the active V6 files or deployed generator. Next gate:
   separate corrected-prompt Qwen235B pilot, answer/format review, then versioned
   full-source regeneration and release integration. Old V6 MultiDoc2Dial remains
