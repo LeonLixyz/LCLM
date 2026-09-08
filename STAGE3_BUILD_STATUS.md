@@ -51,6 +51,11 @@ Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
 
 ## Latest checkpoint — 2026-09-08 13:35 EDT — official-sampling pilot reviewed
 
+- **14:02 EDT monitoring check:** main app remains active with one task; pilot
+  remains idle. BillSum **7,500 attempts / 384 accepted**, saved at14:00:
+  5,617 semantic, 1,460 JSONDecodeError, 18 missing support, 17 ValueError,
+  3 unknown-segment and 1 invalid-segment rejection. No new completed source,
+  failed job, or changed release decision. No new job or inference submitted.
 - Recommended-profile call **fc-01M20ZMD4JGNM7HFSXE7Q3FGD6** completed all24,
   pilot app **ap-RDviKBVxZhjVzB03yrkvaR** now idle. No rerun or production switch.
   Results SHA **284ef6b8ddc6f70f4650ec99ccdb7de933e24495902b79be77edbe81d4f4894d**,
