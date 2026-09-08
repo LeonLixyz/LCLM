@@ -49,7 +49,97 @@ removed, while retaining its task and final-answer contract.
 Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
 `/data/stage3-build-20260906/validation/` on the data volume.
 
-## Latest checkpoint — 2026-09-08 06:55 EDT — completed-review inspector ready; active jobs unchanged
+## Latest checkpoint — 2026-09-08 07:41 EDT — ACORD reviewed; full grounding review fails fresh manual QA
+
+- Main **ap-NT9cm8Mc78qaGB9euDnK99** is active, unchanged, now on BillSum.
+  ACORD completed **58,529 attempts / 50,816 accepted**, with 6,625 exact-answer
+  rejects, 941 invalid segment IDs, 91 ValueError and 56 missing support.
+  BillSum at 07:21: 200 attempts / 10 accepted; this is only early progress.
+  No new GPU inference, restart or deployment change this heartbeat.
+- FaithDial/CLAPNQ **ap-MRs5K5BukSZUvrSm1h2dlv** finished, zero tasks; do not
+  rerun. **8,506 reviewed**: FaithDial **4,610 kept / 3,237 rejected / 37 errors**;
+  CLAPNQ **362 kept / 147 rejected / 113 errors**. Decisions SHA
+  **4cbec1396bcb3716c2a8c95ab62c5d470a820eb81470084b38717795f2d4d358**.
+- Completion inspector **ap-EMd0YVnrb3SmEYsyOhVSSY** passed integrity:
+  **8,356** non-error decisions replayed exactly, **150** errors quarantined,
+  original accepted/rejected ledgers reconciled against all **19,346** prepared
+  tasks (18,357 FaithDial + 989 CLAPNQ). Candidate partition hashes computed in
+  memory only. No raw training subset was written. Nine fresh samples saved in
+  **full-grounding-review-v3-inspection-v1/**, samples SHA
+  **55ea31fe9c2c230897d6fcbbfb6542f1fc1648d5893d960ab69300e810e501a6**.
+- Read all nine untruncated primary-evidence views. **FaithDial fails** again:
+  kept `rea3-b2fbb4946ec1a8ca33a375c7` adds unsupported American/dancer details
+  about Rita Hayworth; kept `rea3-d6ebcca9e0cb1ad5291c30be` answers a Portland,
+  Maine dialogue with a source sentence that does not resolve the state/entity.
+  There are also legitimate exclusions: a pure abstention using `do not contain
+  information` misses the regex, and some quotes fail tokenization matching.
+  Thus rejected/error rows are not all factually wrong. Original decisions stay.
+- Initial CLAPNQ kept sample is source-grounded, but additional inspection
+  **ap-XbJvd1Tfopa2cxxWj0nLqW** selected five fresh kept rows (excluding all 58
+  calibration IDs and the initial nine samples) under **clapnq-kept-review-v1/**,
+  samples SHA **76564e806f9e42f3d3feb7e2f9907f72731919b66016895224e44a92160dbb63**.
+  Read all five: **CLAPNQ fails** at `rea3-21cdaa7991f814d32a1357e8`, which
+  infers `not dating anyone` from a broken-engagement passage. The reviewer
+  accepts that unsupported universal/current claim. Other examples are faithful
+  or have scope limitations; this is not a blanket claim all kept rows are wrong.
+- Saved **data/reviews/stage3-full-grounding-v3-review.json**, uploaded to
+  **full-grounding-review-v3-inspection-v1/manual-review.json**. Both sources
+  explicitly have **approved_for_candidate_materialization=false** and remain
+  held. No source-selection gate changed. Do not release the 4,972 judge-kept
+  candidates merely because bookkeeping passed.
+- **User choice requested asynchronously:** exclude FaithDial and CLAPNQ from
+  the release, or rebuild their traces with stricter evidence-only answers.
+  No answer received at this checkpoint. Do not assume exclusion or launch new
+  inference for them; continue other sources. MAUD/TAT-QA/corrected MD holds also
+  remain, and the failed structured reviewer must not be scaled.
+- ACORD all-row format audit **ap-LQfW8GtScYXEsWOfYW4exV** passed **50,816 rows,
+  zero failures**, **52,203 calls**, **1,134 multi-expansion** traces, minimum
+  **615 segment tokens**. Accepted SHA
+  **7e64d3f0b47dc511a0f3c8cedeff699c36f4097c8b4141042ab5231bb0c3810e**;
+  generation manifest SHA **e58cc899e024c19f7d7e437870b01f90b0c7a2ae8c811a5d73a95a0ee51790cb**.
+  CLI timed out waiting for final logs after the passed report was returned;
+  this is not an audit failure. Sampler **ap-bQCqm1hEstXnUyopmeLrA1** completed.
+- Read both ACORD full samples: multi **rea3-23fa0af8320de18a4a81d812** covers
+  all three primary chunks of post-termination license/royalty obligations;
+  single **rea3-63a4e152a4f3ae3440f3b64e** concerns PGA performance requirements.
+  Both correctly label grade 0 for an unqualified as-is clause query. Native
+  tools, final labels and separation are correct. However both are grade 0
+  and the same query, so broader query/grade coverage is being checked before
+  writing a source sample-pass record.
+- New CPU **data.inspect_acord_coverage_modal** audits original ledgers,
+  compares upstream materialized query/grade counts to prepared tasks, checks
+  every saved task uses normalized 0–4 wording and selects one accepted sample
+  per nonzero grade. First run **ap-n7Nez95G8B3T4U3yTxYKEm** failed only because
+  the inspector incorrectly expected prepared task wording to be normalized.
+  The existing pipeline normalizes 1–5 prepared wording to 0–4 before generation
+  and saving traces. Fixed inspector with pure **acord_question_coverage.py**
+  and **eight passing tests**, including multiline queries and rejection of
+  unnormalized saved questions. No generation/task bytes changed.
+- Retry **ap-OtU0pfXRzdd88EN7FbdiWM** completed, no rerun needed. Artifacts:
+  **/data/stage3-build-20260906/acord-coverage-v1/{report,samples,primary-evidence}.json**.
+  Upstream and prepared query/grade counts match, all 58,529 task IDs reconcile,
+  and every saved question uses 0–4. **51 prepared and 51 accepted unique queries**.
+  Accepted grades **0: 50,547; 1: 181; 2: 9; 3: 8; 4: 71**. Thus **99.47% grade 0**,
+  an important class-balance limitation; no reweighting/downsampling applied.
+  Additional samples SHA **22330b85c9198eaf2d086e42e8b6e8496130881e09d977acd04a9cdce649f84b**.
+- Read all four nonzero-grade primary evidence views: low-partial generic damages
+  waiver (grade 1), indemnity for indirectly related recipient claims (2), CISG
+  governing-law exclusion (3), supplier-only broad indirect-damages waiver (4).
+  All match upstream labels and are plausibly relevant at their grades; exact
+  ordinal distinctions remain annotation judgments. Saved
+  **data/reviews/stage3-full-acord-review.json**, sample_review_passed, general
+  release approval false; uploaded as **full-expansion-manual-review-samples/acord.review.json**.
+  This is six inspected samples plus all-row structural checks, not a claim that
+  every relevance annotation is objectively correct.
+- **Next:** continue existing main generation and review newly completed sources;
+  no other GPU job is running from this heartbeat. Await the user's exclude-vs-
+  rebuild choice for FaithDial/CLAPNQ. MAUD/TAT-QA/corrected MD still need a better
+  validation approach; do not scale either failed question-review pilot. Preserve
+  all holds and raw/rejection ledgers. Base provenance/terms, full expansion export/
+  packing and actual all-component GPU integration remain unresolved. No final
+  raw/packed HF release.
+
+## Historical checkpoint — 2026-09-08 06:55 EDT — completed-review inspector ready; active jobs unchanged
 
 - At 06:51, main **ap-NT9cm8Mc78qaGB9euDnK99** remains active: ACORD
   **56,200 attempts / 48,802 accepted**, approaching 58,529 planned tasks.

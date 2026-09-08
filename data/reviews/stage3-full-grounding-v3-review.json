@@ -1,0 +1,33 @@
+{
+  "status": "manual_review_failed",
+  "review_version": "full-grounding-review-v3",
+  "decisions_sha256": "4cbec1396bcb3716c2a8c95ab62c5d470a820eb81470084b38717795f2d4d358",
+  "protocol_sha256": "d633cf782271f5d4ff68705229570e6ba8ad2186ca27f878a8baa5c7dbb63563",
+  "initial_samples_sha256": "55ea31fe9c2c230897d6fcbbfb6542f1fc1648d5893d960ab69300e810e501a6",
+  "additional_clapnq_samples_sha256": "76564e806f9e42f3d3feb7e2f9907f72731919b66016895224e44a92160dbb63",
+  "approved_for_candidate_materialization": {"faithdial": false, "clapnq": false},
+  "approved_for_release": false,
+  "training_rows_modified": false,
+  "completed_review_counts": {
+    "faithdial": {"kept": 4610, "rejected": 3237, "error": 37},
+    "clapnq": {"kept": 362, "rejected": 147, "error": 113}
+  },
+  "integrity": "All 8,356 non-error decisions replayed exactly, 150 errors quarantined, original accepted/rejected ledgers reconciled to all 18,357 FaithDial and 989 CLAPNQ prepared tasks. This is bookkeeping, not semantic correctness.",
+  "reviewed_examples": [
+    {"task_id": "rea3-42325391475f183bf6c5165b", "source": "clapnq", "outcome": "error", "result": "quarantine", "evidence": "Dam comparison is supported by the supplied passage, but reviewer returned JSONDecodeError. Retain it as an error exclusion, not an incorrect-answer label."},
+    {"task_id": "rea3-69e9198bdca2f74f7c6c4c27", "source": "clapnq", "outcome": "kept", "result": "pass_source_grounding", "evidence": "LTC answer repeats the supplied historical Texas passage. This is source-grounding review, not validation of current law; it must not be represented as current legal guidance."},
+    {"task_id": "rea3-9fab8ecdb3f74ae790adebe9", "source": "clapnq", "outcome": "rejected", "result": "conservative_quote_exclusion", "evidence": "Right-on-red answer largely follows source. A quote changes fuel - saving to fuel-saving, failing conservative quote matching. This is not proof the answer is false."},
+    {"task_id": "rea3-01a1f23470e43f0438a8dbe1", "source": "faithdial", "outcome": "error", "result": "quarantine", "evidence": "Invalid JSON escape. Source provides the concert record and album count but not how loudness was measured, which is the actual question. Answer supplies background without resolving or explicitly abstaining on the requested measurement method."},
+    {"task_id": "rea3-a46fa1d946714b0eaf688fca", "source": "faithdial", "outcome": "error", "result": "quarantine", "evidence": "Malformed JSON. Source supports stock-car/Le Mans/Lola/Ford GT40 design elements but not the candidate's Corvette addition, which comes from dialogue history."},
+    {"task_id": "rea3-b2fbb4946ec1a8ca33a375c7", "source": "faithdial", "outcome": "kept", "result": "false_accept", "evidence": "Rita Hayworth answer adds American and dancer, plus evaluative embellishments, to a primary sentence about Gilda, Glenn Ford and her first major dramatic role. The reviewer quotes that sentence but marks every additional assertion supported. In particular dancer is not established by retrieved primary evidence."},
+    {"task_id": "rea3-d6ebcca9e0cb1ad5291c30be", "source": "faithdial", "outcome": "kept", "result": "unresolved_entity_scope", "evidence": "Dialogue explicitly concerns Portland, Maine; retrieved sentence only says Portland MSA with a population/rank and does not identify the state. Reviewer accepts it as answering Maine without resolving the source/entity ambiguity. No external population fact was used to clear or correct this trace."},
+    {"task_id": "rea3-2c4a3c05d7e3f67755449e82", "source": "faithdial", "outcome": "rejected", "result": "false_exclusion", "evidence": "Pure justified abstention about thrift-store charity revenue is rejected because the mechanical absence regex does not cover 'do not contain information'. Source is about the song Thrift Shop. Preserve the rejection record; do not silently change the completed protocol."},
+    {"task_id": "rea3-bb1bc26535685e8f9d50337c", "source": "faithdial", "outcome": "rejected", "result": "correct_rejection", "evidence": "Primary evidence only supplies original Jeopardy broadcast dates. The 1984 revival/host-change assertion is absent. Reviewer correctly rejects the unsupported answer."},
+    {"task_id": "rea3-720f587d2d60cfe90d8a859a", "source": "clapnq", "outcome": "kept", "result": "scope_limitation", "evidence": "Source heading WrestleMania XXVIII supports The Rock winning that match, but the same passage also says Cena won the rematch. Candidate omits the event distinction; do not claim broad unqualified correctness."},
+    {"task_id": "rea3-e829b8a6d07a3c60096f7947", "source": "clapnq", "outcome": "kept", "result": "pass_source_grounding", "evidence": "All three plant-tissue functions and descriptions are supplied in the passage. Review assesses source fidelity, not an independent botany validation."},
+    {"task_id": "rea3-922fd2c38f8c35dd6d2c4702", "source": "clapnq", "outcome": "kept", "result": "pass_source_grounding", "evidence": "River origin, Middle River/Mill Brook confluence, Rhode Island course and Seekonk/Providence endpoint all follow the primary passage."},
+    {"task_id": "rea3-21cdaa7991f814d32a1357e8", "source": "clapnq", "outcome": "kept", "result": "false_accept", "evidence": "Passage establishes the broken engagement with Sami, not that Lucas is dating nobody. Candidate asserts 'not dating anyone'; reviewer accepts this unsupported universal/current relationship claim."},
+    {"task_id": "rea3-05350b25255d2728e13971a1", "source": "clapnq", "outcome": "kept", "result": "pass_source_grounding", "evidence": "Amy Winehouse heading and the two single descriptions support the requested artist answer."}
+  ],
+  "next_scope": "Do not materialize or release the 4,972 judge-kept candidates as approved data. Both source holds remain. User has been asked whether to exclude these two sources or rebuild evidence-only traces; no answer received yet. Other source generation/audits may continue. Original bytes and all error/rejection accounting are preserved."
+}
