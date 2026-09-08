@@ -49,7 +49,25 @@ removed, while retaining its task and final-answer contract.
 Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
 `/data/stage3-build-20260906/validation/` on the data volume.
 
-## Latest checkpoint — 2026-09-07 22:23 EDT — generation progressing; base inventory saved
+## Latest checkpoint — 2026-09-07 22:52 EDT — ninth source complete, audit running
+
+- Generator **ap-NT9cm8Mc78qaGB9euDnK99**, call
+  **fc-01M1ZB04K1DJ94V1PGWTGC9224**, remains active with one container.
+  MultiDoc2Dial completed at 22:47 EDT: **21,451 attempts / 13,268 accepted**.
+  Nine completed sources now total **82,431 attempts / 38,528 accepted**.
+- FaithDial is next and running. Latest inspected checkpoint: **600 attempts /
+  198 accepted**. Combined checkpoint total: **83,031 attempts / 38,726 accepted**.
+  FaithDial has 18,357 tasks; no completion report yet. No new generation job
+  or model switch was made.
+- Launched the full MultiDoc2Dial accepted-row format/label audit in
+  **ap-OyEpu1agGPUnA0nYWRdVLt** with
+  `modal run --detach -m data.audit_full_expansion_modal --sources multidoc2dial`.
+  No existing audit/report was present. Await
+  `/data/stage3-build-20260906/full-expansion-format-audit/multidoc2dial.json`;
+  do not treat the running audit as passed. Eight earlier source audits remain
+  passed. Later-source audits and final semantic review are still pending.
+
+## Historical checkpoint — 2026-09-07 22:23 EDT — generation progressing; base inventory saved
 
 - Generator **ap-NT9cm8Mc78qaGB9euDnK99**, call
   **fc-01M1ZB04K1DJ94V1PGWTGC9224**, remains active with one GPU container;
