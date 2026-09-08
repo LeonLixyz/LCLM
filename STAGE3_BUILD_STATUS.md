@@ -49,7 +49,7 @@ removed, while retaining its task and final-answer contract.
 Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
 `/data/stage3-build-20260906/validation/` on the data volume.
 
-## Latest user request — 2026-09-08 11:55 EDT — Qwen3.8-27B non-thinking comparison
+## Latest user request — 2026-09-08 12:00 EDT — Qwen3.8-27B non-thinking pilot submitted
 
 - User selected **Qwen/Qwen3.8-27B** as an alternative with instruct mode.
   Official card confirms `chat_template_kwargs.enable_thinking=false`; no need
@@ -68,11 +68,20 @@ Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
   API raw requests/responses stay separate from diagnostic traces. No new
   self-judge: fixed-answer rules are reported separately; free-form answers need
   manual paired review. No pilot trace can pass release selection automatically.
-- CPU prepare run **ap-ExW3vuHv7N02aTQb2GZ6iI** is building the serving image
-  before preparing inputs. Local command session **30228**. No pilot inference
-  yet; no deployed pilot call yet. Main 235B **ap-NT9cm8Mc78qaGB9euDnK99** is
-  unchanged. Finish preparation, deploy this separate app, then explicitly
-  `.spawn()` its `pilot` function once and record the call. Never redeploy main.
+- Initial prepare **ap-ExW3vuHv7N02aTQb2GZ6iI** failed building the image because
+  official vLLM image provides `python3` but no `python` command. Added the
+  image-local Python symlink; no local environment or active main app changed.
+  Retry CPU prepare **ap-qDjWWjuqtbYzruvJAqCFFt** completed: **16 harvesting/
+  CoT-removal tests passed**, all **24 baseline/prepared task pairs matched**.
+  Inputs SHA **ac6e54c31e7554c173ccd19513028d5d8d5d0b0096cfce78f8a4af70dac6f210**.
+- Deployed separate pilot **ap-RDviKBVxZhjVzB03yrkvaR**, and submitted exactly
+  once: **fc-01M20VYFZKGB0QGV913ND6Q98J**, one active task at 12:00.
+  Startup/generation results still pending. **Do not resubmit or redeploy while
+  active.** Inspect output `server.log`, `failure.json`, `progress.json`, then
+  `report.json` / `results.jsonl`; original raw API responses are separate.
+  Main 235B **ap-NT9cm8Mc78qaGB9euDnK99** remains unchanged with one active task.
+  Next: finish this bounded comparison and inspect complete paired evidence;
+  do not switch production on a higher self-judged acceptance rate.
 - Runtime: official **vllm/vllm-openai:v0.28.0**, transformers **5.16.1**,
   H200:8, 32K context, TP8, concurrency4, 90-minute maximum. No DFlash claim for
   this 27B deployment; official recipe supports native tools/non-thinking.

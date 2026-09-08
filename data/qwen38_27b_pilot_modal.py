@@ -15,6 +15,7 @@ SOURCES = ('billsum', 'finqa', 'tatqa', 'contract_nli', 'faithdial', 'clapnq')
 app = modal.App(APP)
 cache = modal.Volume.from_name('lclm-hf-cache')
 image = (modal.Image.from_registry('vllm/vllm-openai:v0.28.0').entrypoint([])
+         .run_commands('ln -s /usr/bin/python3 /usr/local/bin/python')
          .uv_pip_install('transformers==5.16.1', 'openai>=2,<3')
          .env({'HF_HOME': '/cache/huggingface', 'PYTHONPATH': '/opt/lclm',
                'HF_XET_HIGH_PERFORMANCE': '1', 'TOKENIZERS_PARALLELISM': 'false'})
