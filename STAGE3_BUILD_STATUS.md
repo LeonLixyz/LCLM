@@ -49,7 +49,35 @@ removed, while retaining its task and final-answer contract.
 Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
 `/data/stage3-build-20260906/validation/` on the data volume.
 
-## Latest user request — 2026-09-08 12:00 EDT — Qwen3.8-27B non-thinking pilot submitted
+## Latest checkpoint — 2026-09-08 — Qwen3.8-27B pilot completed and reviewed
+
+- Pilot **ap-RDviKBVxZhjVzB03yrkvaR** completed all **24 cases**, now zero active
+  tasks; no resubmission. Results SHA
+  **f99dbb8551aeac8c52706a03f9474dbdd6d75176e3a5430c5d1a47e4a621bd4c**.
+- All 24 raw-response hashes checked. All **52 requests** explicitly disable
+  thinking; no nonempty reasoning fields or think/analysis tags observed.
+  **33 native expand calls** have valid segment IDs and exact prepared tool
+  results; two are repeated expansions. **18 cleaned diagnostic traces**,
+  **5 duplicate-FINAL harvesting failures**, **1 repetition-to-token-limit**.
+  These are diagnostic rows, not new accepted training data.
+- Source review confirms two TAT-QA false exact-match rejections despite correct
+  explanatory numbers. FinQA net 7 is supported entirely by expanded seg_7;
+  missing required seg_8 is unrelated loan-accounting continuation. Requiring
+  all source chunks is not equivalent to requiring necessary answer evidence.
+- Free-form pilot exact-match scores are not comparable to production semantic
+  votes. BillSum added history/procedure wording and several ContractNLI/CLAPNQ
+  question-scope ambiguities still prevent blanket grounding approval.
+- Temperature zero matched the original teacher but not official 27B instruct
+  settings (temperature .7, top_p .8, top_k20, presence_penalty1.5). Repetition
+  needs a bounded official-settings follow-up before any model-quality verdict.
+  **No follow-up submitted, no production switch, no gate or source changes.**
+- Full paired findings: **data/reviews/stage3-qwen38-27b-pilot-review.json**.
+  Main 235B remains active; 12:31 EDT BillSum checkpoint **5,900 attempts /
+  295 accepted** (4,398 semantic, 1,173 JSONDecodeError, 17 missing support,
+  13 ValueError, 3 unknown-segment, 1 invalid-segment rejection). All previous
+  source quality, provenance, completion and release holds remain.
+
+## Previous user request — 2026-09-08 12:00 EDT — Qwen3.8-27B non-thinking pilot submitted
 
 - **12:02 EDT check:** both existing jobs still have one active task. Pilot
   has committed input manifest and server command, but no progress, failure or
