@@ -4,11 +4,12 @@ import json
 from pathlib import Path
 import modal
 from data.stage3_full_modal import image as cpu_image, volume, ROOT
+from data.qwen38_pilot_sampling import sampling_kwargs, output_name, FROZEN_INPUTS_SHA256
 
 APP = 'lclm-qwen38-27b-teacher-pilot-v1'
 MODEL = 'Qwen/Qwen3.8-27B'
 REVISION = '1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0'
-OUTPUT = ROOT/'qwen38-27b-teacher-pilot-v1'
+BASE_OUTPUT = ROOT/'qwen38-27b-teacher-pilot-v1'
 BASE = Path('/data/stage3-agent/real-expansion/pilots/full-20260906-v6')
 TASKS = BASE.parent/'full-20260906-v3'
 SOURCES = ('billsum', 'finqa', 'tatqa', 'contract_nli', 'faithdial', 'clapnq')
@@ -28,10 +29,12 @@ def sha(raw):
 
 
 @app.function(image=cpu_image, cpu=2, memory=8192, timeout=1800, volumes={'/data': volume})
-def prepare():
+def prepare(profile: str = 'matched'):
     import subprocess
     from data.expansion_task_normalization import prepare_teacher_task
+    OUTPUT = ROOT/output_name(profile)
     subprocess.run(['python', '-m', 'pytest', '-q',
+                    '/opt/lclm/tests/test_qwen38_pilot_sampling.py',
                     '/opt/lclm/tests/test_harvest_expansion_trace.py',
                     '/opt/lclm/tests/test_clean_agent_trajectories.py'], check=True)
     volume.reload()
@@ -40,6 +43,27 @@ def prepare():
         manifest = json.loads((OUTPUT/'manifest.json').read_text())
         if sha(payload) != manifest['inputs_sha256'] or manifest['model_revision'] != REVISION:
             raise ValueError('Changed existing pilot inputs')
+        if profile == 'recommended' and (sha(payload) != FROZEN_INPUTS_SHA256 or
+                manifest.get('sampling_kwargs') != sampling_kwargs(profile)):
+            raise ValueError('Changed recommended-profile inputs or sampling')
+        return manifest
+    if profile == 'recommended':
+        raw = (BASE_OUTPUT/'inputs.json').read_bytes()
+        previous = json.loads((BASE_OUTPUT/'manifest.json').read_text())
+        completed = json.loads((BASE_OUTPUT/'report.json').read_text())
+        if (sha(raw) != FROZEN_INPUTS_SHA256 or
+                previous['model_revision'] != REVISION or completed['completed'] != 24 or
+                completed['inputs_sha256'] != FROZEN_INPUTS_SHA256 or len(json.loads(raw)) != 24):
+            raise ValueError('Original completed comparison does not match frozen inputs')
+        manifest = {**previous, 'sampling_profile': profile, 'temperature': 0.7,
+                    'sampling_kwargs': sampling_kwargs(profile),
+                    'paired_baseline_directory': str(BASE_OUTPUT),
+                    'sampling_scope': 'Same frozen 24 tasks and budgets; official instruct sampling. One trial, not a representative yield estimate.',
+                    'sampling_reference': 'https://huggingface.co/Qwen/Qwen3.8-27B'}
+        OUTPUT.mkdir(exist_ok=False)
+        (OUTPUT/'inputs.json').write_bytes(raw)
+        (OUTPUT/'manifest.json').write_text(json.dumps(manifest, indent=2))
+        volume.commit()
         return manifest
     cases = []
     for source in SOURCES:
@@ -90,7 +114,7 @@ def prepare():
               max_containers=1, scaledown_window=60,
               volumes={'/data': volume, '/cache': cache},
               secrets=[modal.Secret.from_name('huggingface')])
-def pilot():
+def pilot(profile: str = 'matched'):
     import os
     import subprocess
     import time
@@ -101,11 +125,15 @@ def pilot():
     from data.clean_agent_trajectories import strip_cot
     from data.harvest_expansion_trace import harvest_training_messages
     from data.real_expansion_agent import verify_real_trace
+    OUTPUT = ROOT/output_name(profile)
     volume.reload()
     raw = (OUTPUT/'inputs.json').read_bytes()
     manifest = json.loads((OUTPUT/'manifest.json').read_text())
     if sha(raw) != manifest['inputs_sha256'] or manifest['model_revision'] != REVISION:
         raise ValueError('Missing/stale input preparation')
+    if profile == 'recommended' and (sha(raw) != FROZEN_INPUTS_SHA256 or
+            manifest.get('sampling_kwargs') != sampling_kwargs(profile)):
+        raise ValueError('Changed recommended-profile inputs or sampling')
     cases = json.loads(raw)
     if len(cases) != 24: raise ValueError('Unbounded pilot input')
     if (OUTPUT/'report.json').exists(): return json.loads((OUTPUT/'report.json').read_text())
@@ -134,13 +162,13 @@ def pilot():
             def run(case):
                 records = []; task = case['task']; phase = 'rollout'
                 result = {'task_id': task['task_id'], 'source': case['source'],
+                          'sampling_profile': profile,
                           'baseline_verification': case['baseline']['verification'],
                           'approved_for_release': False}
                 started = time.monotonic()
                 def complete(messages, tools):
                     request = {'model': MODEL, 'messages': messages_for_openai_api(messages),
-                        'temperature': 0, 'max_tokens': 2048,
-                        'extra_body': {'chat_template_kwargs': {'enable_thinking': False}}}
+                               **sampling_kwargs(profile)}
                     if tools: request.update(tools=list(tools), tool_choice='auto')
                     entry = {'request': request}; records.append(entry)
                     response = client.chat.completions.create(**request)
@@ -161,6 +189,7 @@ def pilot():
                         result['rule_verification'] = verify_real_trace(task, trace['messages'])
                         trace.update(model=MODEL, model_revision=REVISION, source_dataset=task['source_dataset'],
                             source_row_id=task['source_row_id'], generation={'enable_thinking': False,
+                            'sampling_profile': profile,
                             'teacher_prompt_saved_in_training_messages': False})
                         trace['verification'] = {'accepted': False, 'reason': 'diagnostic_pending_manual_review'}
                         result['diagnostic_trace'] = trace
@@ -178,6 +207,7 @@ def pilot():
                     (OUTPUT/'progress.json').write_text(json.dumps({'completed': len(results), 'total': 24}))
                     volume.commit()
             report = {'status': 'awaiting_manual_comparison', 'completed': len(results),
+                      'sampling_profile': profile, 'sampling_kwargs': sampling_kwargs(profile),
                       'errors': sum('error' in r for r in results),
                       'rollout_failures': sum(bool(r.get('rollout_failure_reason')) for r in results),
                       'inputs_sha256': manifest['inputs_sha256'],
@@ -197,5 +227,5 @@ def pilot():
 
 
 @app.local_entrypoint()
-def main():
-    print(json.dumps(prepare.remote(), indent=2))
+def main(profile: str = 'matched'):
+    print(json.dumps(prepare.remote(profile), indent=2))

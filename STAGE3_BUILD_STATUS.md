@@ -49,7 +49,32 @@ removed, while retaining its task and final-answer contract.
 Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
 `/data/stage3-build-20260906/validation/` on the data volume.
 
-## Latest checkpoint — 2026-09-08 — Qwen3.8-27B pilot completed and reviewed
+## Latest checkpoint — 2026-09-08 13:05 EDT — bounded official-sampling follow-up running
+
+- Checked existing jobs and persistent reports first: original 27B pilot complete
+  and idle, main 235B still active. Main BillSum **6,400 attempts / 318 accepted**
+  (4,769 semantic, 1,278 JSONDecodeError, 18 missing-support, 13 ValueError,
+  3 unknown-segment, 1 invalid-segment rejection). No production change.
+- Added only two explicit diagnostic sampling profiles; original matched profile
+  retains its request parameters. Recommended profile uses temperature .7,
+  top_p .8, top_k20, presence_penalty1.5, min_p0, repetition_penalty1,
+  with **enable_thinking=false**, the same 2,048-token and 16-call budgets.
+  No new prompt or judge, no trace repair/deduplication, no production switch.
+- CPU prepare **ap-vl2IGVaYDP1jOJbtwgMUpZ**: **24 tests passed** (8 sampling
+  guards plus 16 existing harvesting/CoT tests). Frozen input bytes copied from
+  completed v1, SHA **ac6e54c31e7554c173ccd19513028d5d8d5d0b0096cfce78f8a4af70dac6f210**.
+  New output **/data/stage3-build-20260906/qwen38-27b-teacher-recommended-v2/**.
+  Prior v1 artifacts remain intact; manifest and runtime enforce the frozen hash.
+- Redeployed only the idle pilot app **ap-RDviKBVxZhjVzB03yrkvaR**, then submitted
+  recommended profile exactly once: **fc-01M20ZMD4JGNM7HFSXE7Q3FGD6**. At 13:05
+  one active pilot task and one active main task. Do not resubmit or redeploy
+  while active. H200:8, same pinned model and runtime, 90-minute timeout.
+- Next inspect v2 progress/failure/report/raw responses and compare against v1:
+  repetition, native tools, primary-evidence grounding, source-scope errors.
+  One stochastic trial is not a representative quality estimate. All release
+  and provenance holds persist; no diagnostic rows approved for training.
+
+## Previous checkpoint — 2026-09-08 — Qwen3.8-27B pilot completed and reviewed
 
 - Pilot **ap-RDviKBVxZhjVzB03yrkvaR** completed all **24 cases**, now zero active
   tasks; no resubmission. Results SHA
