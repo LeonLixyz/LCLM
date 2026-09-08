@@ -49,7 +49,23 @@ removed, while retaining its task and final-answer contract.
 Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
 `/data/stage3-build-20260906/validation/` on the data volume.
 
-## Latest checkpoint — 2026-09-07 21:44 EDT — full generation submitted
+## Latest checkpoint — 2026-09-07 21:52 EDT — resumed generation healthy
+
+- Deployed app **ap-NT9cm8Mc78qaGB9euDnK99**, call
+  **fc-01M1ZB04K1DJ94V1PGWTGC9224**, is healthy and generating with one
+  H200:8 container. Do not duplicate. Latest persisted MultiDoc2Dial checkpoint
+  reports 200 new attempts, **16,702 cumulative attempts / 10,064 accepted**.
+  Including eight completed sources: **77,682 attempts / 35,324 accepted**.
+- User confirmed the choice to continue Qwen235B-Instruct without thinking.
+  No model switch or task-manifest change. Server logs show normal inference
+  after startup; new checkpoints demonstrate progress after the local submitter
+  exited. This does not prove the cause of past cancellations.
+- Base provenance inspector is being retried separately on CPU in
+  **ap-3VhthOxDUtpOsCRVpJSbq4** after confirming no existing inspector app
+  or persisted report. It does not modify base rows
+  and cannot substitute for the missing original source/license mapping.
+
+## Historical checkpoint — 2026-09-07 21:44 EDT — full generation submitted
 
 - User explicitly requested generation of all tasks; the previous cancellation
   hold is lifted. No other LCLM app was listed before starting checkpoint audit
