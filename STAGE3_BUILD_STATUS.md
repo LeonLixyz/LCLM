@@ -51,6 +51,14 @@ Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
 
 ## Latest user request — 2026-09-08 12:00 EDT — Qwen3.8-27B non-thinking pilot submitted
 
+- **12:02 EDT check:** both existing jobs still have one active task. Pilot
+  has committed input manifest and server command, but no progress, failure or
+  completion report yet; committed server log is still empty. Startup stdout
+  is redirected to that file and may not be visible until a volume commit.
+  Do not mistake this early startup snapshot for a failure or resubmit.
+  Main BillSum advances to **5,300 attempts / 252 accepted** (3,970 semantic
+  rejects, 1,046 JSONDecodeError, 15 missing support, 13 ValueError, 3 unknown
+  segments, 1 invalid segment ID). No job/gate/model changes this check.
 - User selected **Qwen/Qwen3.8-27B** as an alternative with instruct mode.
   Official card confirms `chat_template_kwargs.enable_thinking=false`; no need
   to ask again about 2.4T low-effort thinking. Model revision pinned to
