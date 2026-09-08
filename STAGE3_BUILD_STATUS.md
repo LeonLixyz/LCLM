@@ -49,7 +49,53 @@ removed, while retaining its task and final-answer contract.
 Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
 `/data/stage3-build-20260906/validation/` on the data volume.
 
-## Latest checkpoint — 2026-09-08 02:26 EDT — CLAPNQ held; 58-row grounding calibration prepared
+## Latest checkpoint — 2026-09-08 02:58 EDT — claim-grounding diagnostic submitted
+
+- Existing full jobs unchanged: main **ap-NT9cm8Mc78qaGB9euDnK99** ACORD latest
+  inspected checkpoint **18,100 attempts / 15,073 accepted**; corrected full
+  **ap-c9DCBmAQMHHS4aJt9MASov** MultiDoc2Dial **9,900 / 7,278**. Both active
+  with one task each. Do not duplicate/redeploy them. Eleven main sources complete.
+- Added pure `data/grounding_claim_review.py`: identity-scoped primary expanded
+  evidence only, excluding RELATED SOURCE padding and distractor expansions;
+  lossless sentence coverage, exact segment-specific evidence quotes for factual
+  claims, typed fail-closed judge schema and explicit pure-abstention handling.
+  Every sentence must pass before a fresh whole-answer/current-question fit vote.
+  No reference answer, manual labels or control expectations are sent to judges;
+  input training rows are never modified. Quotes can be mechanically checked;
+  entailment/absence and sentence classification still remain model heuristics.
+- **118 CPU tests passed** in **ap-nNhBgNXobrRusbN026ZRzq**, including exact quote
+  scope, invented/distractor quotes, mixed-claim abstention bypass, legitimate
+  missing-information lists, malformed votes, full sentence coverage and teacher/
+  control separation. Preflight also parsed all **58 real calibration rows** and
+  verified their pinned bytes, membership, controls and primary evidence.
+  Input manifest SHA **a0cfe5bb46ed252905baa4a9bf2e6135ebf0635a68f5b0e3a3aec663b6105f6b**.
+  Earlier iteration 117 tests passed in **ap-2BqBXuvkriTJcIW88Fdz09**.
+- Deployed **lclm-grounding-claims-pilot-v1**, app
+  **ap-D6B6a2sq9oR6r05ny7F7rz**, then submitted exactly once with
+  **fc-01M1ZWX8PHPJJPG1VV4ZCDQWYQ**. New module
+  `data/run_grounding_calibration_modal.py`; **do not duplicate/redeploy while active**.
+  This is a separate **58-row diagnostic**, H200:8, max one container, two-hour
+  function bound with server startup bounded to 90 minutes; server terminated
+  in finally, scale-down 60 seconds. Same pinned Qwen235B-Instruct, no thinking,
+  vLLM 0.21.0, temperature 0, 1,536 judge output tokens, concurrency eight.
+- Output `/data/stage3-build-20260906/grounding-calibration-claims-v1/`:
+  `manifest.json`, per-row fsynced/committed `decisions.jsonl`, final `report.json`.
+  Resume is hash/version-bound and skips already judged IDs, including errors.
+  Final control scoring occurs only after decisions, outside judge inputs.
+  No full-source operation is exposed; results always retain
+  `approved_for_full_source_review: false` and `approved_for_release: false`.
+  Submission is confirmed; model/inference completion still needs checking.
+- Next: inspect diagnostic report plus all four control decisions and sampled
+  keep/reject cases against source passages. It must reject both known failures,
+  retain both grounded controls and receive manual review before any broad source
+  re-review. Failed calibration stays diagnostic; use a new version for protocol
+  changes. FaithDial and CLAPNQ release holds remain. Continue other completed
+  source manual reviews and existing full-generation monitoring. Corrected full
+  MultiDoc2Dial still needs its own completed-source audit/review. No export,
+  expansion packing, final GPU validation or HF release yet; base provenance gates
+  also remain unresolved.
+
+## Historical checkpoint — 2026-09-08 02:26 EDT — CLAPNQ held; 58-row grounding calibration prepared
 
 - Both full generators remain active and unchanged, one task each. Main
   **ap-NT9cm8Mc78qaGB9euDnK99** ACORD checkpoint **13,200 attempts / 10,774 accepted**;
