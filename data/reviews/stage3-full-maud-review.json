@@ -1,0 +1,26 @@
+{
+  "source": "maud",
+  "status": "sample_review_failed",
+  "approved_for_release": false,
+  "scope": "Two deterministic full-run samples; source held pending mapping/grounding investigation, not an estimated source-wide error rate",
+  "accepted_file_sha256": "2140c05e4f0c3259da37a3e21900a1b779a5f8141a5e37cf20647bea7dc268f5",
+  "sample_artifact": "/data/stage3-build-20260906/full-expansion-manual-review-samples/maud.json",
+  "reviewed_examples": [
+    {
+      "task_id": "rea3-056c5e1e18febd81c7a339de",
+      "category": "multi",
+      "result": "fail",
+      "evidence": "The question explicitly asks COR standard (superior offer). The quoted reasonably-expected-breach standard appears in Section 6.02(d)(ii)(B) and (E), both tied to an Intervening Event. Superior Proposal provisions in (c) and (d)(i) instead discuss notice, negotiation and remaining a superior proposal. The supplied extract does not establish that the intervening-event standard applies to the superior-offer question. Matching the reference label alone does not resolve this scope mismatch.",
+      "remediation": "Inspect pinned MAUD training row 15517 and its question, answer and source mappings. Distinguish upstream annotation inconsistency from adapter error. Do not silently relabel or use unrelated contract excerpts as support."
+    },
+    {
+      "task_id": "rea3-dfd2cd4181471cf3645dee8a",
+      "category": "single",
+      "result": "pass",
+      "evidence": "The specified primary no-shop clause distinguishes officers/directors from other Representatives and applies commercially reasonable efforts to the latter. Reasonable standard matches the requested non-D&O category. Related-source MAE padding is not used."
+    }
+  ],
+  "trajectory_checks": "Read both task questions and label sets, schemas, native calls, complete primary chunks and final labels. The 11,851-row format audit passes but cannot establish that an exact reference label is grounded in the right contractual condition.",
+  "source_inspection": "CPU diagnostic read materialized training row 15517. data_type=rare_answers, id=80, question=COR standard (superior offer), answer=Reasonably likely/expected breach of fiduciary duties, and the same supplied extract all occur together in that source row. Only one annotation has this exact text. Thus the observed mismatch is not a simple question/text swap by _maud; the upstream extract/label pairing needs grounding review. Artifact: /data/stage3-build-20260906/full-source-review-findings-v1/maud-row-15517.json.",
+  "required_followup": "Source hold is enforced by release selection. Preserve originals; resolve via bounded source-specific diagnostic review and versioned correction/exclusion accounting before release."
+}

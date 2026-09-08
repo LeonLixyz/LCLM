@@ -1,0 +1,25 @@
+{
+  "source": "convfinqa",
+  "status": "sample_review_passed",
+  "approved_for_release": false,
+  "scope": "Two deterministic full-run samples only; not source-wide correctness or release approval",
+  "accepted_file_sha256": "9a5694ec6d11700ffaa881926a156cc0346712412b637008f0f3bab8165f6490",
+  "sample_artifact": "/data/stage3-build-20260906/full-expansion-manual-review-samples/convfinqa.json",
+  "reviewed_examples": [
+    {
+      "task_id": "rea3-3ef437389ec1239508b95a6b",
+      "category": "multi",
+      "result": "pass",
+      "evidence": "The allowance table shows December 31 balances of $(45) in 2018 and $(42) in 2017. The signed change is -3, a decrease of magnitude 3. FINAL: $(3) uses the source's accounting-negative notation; the reference expresses the decrease magnitude as 3. This contextual judgment is not a general equivalence of positive and accounting-negative values.",
+      "efficiency_note": "The first expansion contains both values. The second expansion supplies the rest of the primary document but is unnecessary for this subtraction."
+    },
+    {
+      "task_id": "rea3-32c5d25c2e8936ec6b26dcf5",
+      "category": "single",
+      "result": "pass",
+      "evidence": "Entergy net revenue increased from 4,694 in 2009 to 5,051 in 2010. Independently computed (5051 - 4694) / 4694 * 100 = 7.605453770771198%, rounding to the final 7.61%. Both numbers appear in the expanded primary table."
+    }
+  ],
+  "trajectory_checks": "Read both task systems, tool schemas, all native calls, complete observations and final answers. Full 325-row format audit passed separately. Related-source padding was not used for either answer.",
+  "verifier_limitation": "The current token normalizer preserves explicit signs but ignores accounting parentheses. This sample is defensible from its decrease wording; other accepted financial answers with accounting notation need a read-only collision inventory before the final release review. Do not modify an active generator in place."
+}

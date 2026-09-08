@@ -49,7 +49,83 @@ removed, while retaining its task and final-answer contract.
 Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
 `/data/stage3-build-20260906/validation/` on the data volume.
 
-## Latest checkpoint — 2026-09-08 04:33 EDT — V3 calibrated; full held-source review submitted
+## Latest checkpoint — 2026-09-08 05:05 EDT — corrected MD complete; broader manual QA catches additional holds
+
+- Main **ap-NT9cm8Mc78qaGB9euDnK99** remains active and unchanged: ACORD
+  **39,600 attempts / 34,015 accepted**. FaithDial/CLAPNQ full grounding review
+  **ap-MRs5K5BukSZUvrSm1h2dlv** is actively inferring, **1,500 / 8,506 reviewed**.
+  Never duplicate/redeploy either. No new GPU inference job was started this turn.
+- Corrected MultiDoc2Dial **ap-c9DCBmAQMHHS4aJt9MASov** completed all **21,451**
+  attempts: **16,158 accepted**, 2,648 semantic rejects, 1,124 ValueError,
+  62 JSONDecodeError, 721 missing support, 738 no-tool-call. Full report persisted
+  in `multidoc2dial-chronological-v1-full`; do not resume this completed run.
+- All-row corrected MD audit **ap-7aQNjR5TsjlA9I1CMltXLE** passed **16,158 rows,
+  zero errors**, 24,389 calls, 6,187 multi-expansion traces, minimum 594 tokens.
+  Accepted SHA **a99104742ebbe657963ba58cb976c0eb223c7fbc71b48ce7d060f8b389d44bfa**;
+  generation manifest SHA **b81c29ef08f7727f7f9ae5d91dead5d68fa10c7a4dd48b54881180e96cc0b6bd**.
+  Sampler **ap-Dbr7VuhUbpEKSM3TiOPrYO** wrote two full-source examples.
+- Corrected MD manual review **FAILED** despite format pass. Multi sample
+  **rea4-md2d-873fbe82c90af128e0f9775e** answers the correct chronological turn,
+  but changes source length `80 feet or greater` / height `14 feet or greater`
+  to `exceeding` thresholds. Single **rea4-md2d-6dbabd8d53116f6cfd91c521** passes:
+  SSA phone/TTY/office/hours all present in the primary source. Full review saved
+  `data/reviews/stage3-md2d-corrective-full-review.json`, uploaded as corrected
+  full **release-review.json with approved_for_release=false**. Hold enforced by
+  selection. Chronology repair succeeded; semantic quality is not yet approved.
+- Completed initial full-source manual samples for five remaining main sources,
+  all original bytes preserved. CPU sampler apps: TAT-QA **ap-TugOERmMtViJHhSzBCp0t5**,
+  ConvFinQA **ap-mddnglhFhDIld1qYv5JlCn**, MultiHiertt **ap-RgmqrfuZNi2H4jzRWlZIG4**,
+  MAUD **ap-kLEVwMhoJO1cNrFcwZXd3h**, ContractNLI **ap-96rZ1fvXoFlvlWzuRS4my3**.
+  ConvFinQA, MultiHiertt and ContractNLI samples pass; reviews committed under
+  `data/reviews/stage3-full-<source>-review.json` and uploaded to main sample root.
+  Multi-expansion numeric tasks often need only one chunk; ContractNLI absence
+  sample appropriately covers the whole contract. Do not equate call count with
+  necessary reasoning hops. TAT-QA's initial two samples passed, but see hold below.
+- **MAUD held:** multi **rea3-056c5e1e18febd81c7a339de** asks superior-offer COR
+  standard while the matching fiduciary-breach wording is under an intervening-
+  event condition. Single **rea3-dfd2cd4181471cf3645dee8a** passes the commercially
+  reasonable-efforts criterion for non-D&O representatives. MAUD review status
+  `sample_review_failed` uploaded; no source approval from exact label matching.
+- Read-only CPU findings job **ap-ANnEpRKBmN9HjR8wI4UneT** inspected original MAUD
+  train row 15517: `rare_answers`, id 80, same question/label/extract; only one
+  annotation has identical text. This is not a simple adapter question/text swap.
+  Artifact **/data/stage3-build-20260906/full-source-review-findings-v1/** has
+  `maud-row-15517.json`, `report.json`, full `accounting-candidates.json` and
+  `accounting-evidence.json`. Financial source hashes rechecked on all **7,308**
+  accepted rows. Accounting-normalization candidates: TAT-QA **34**, ConvFinQA
+  **1**, FinQA/MultiHiertt **0**. The ConvFinQA decrease sample is contextually
+  valid. Detector only inventories potential collisions; no auto-reject/edits.
+- Read all 35 flagged primary evidence views. Many are faithful negative table
+  values or valid positive expense/loss magnitudes, NOT errors. However **TAT-QA
+  held** for confirmed temporal/ordering failures: **rea3-d3c8423a899103393b8cbf4f**
+  asks 2018 exercised shares but copies a 2019 roll-forward movement; **rea3-220ec59697c604b7dc911004**
+  returns 2019/2018 values where question explicitly requests 2018/2019. Further
+  change-vs-magnitude and implicit-thousands/currency cases require contextual
+  review, not blanket sign equivalence. Updated TAT-QA review to failed with
+  separate additional findings, uploaded; its initial passing samples preserved.
+- Added read-only accounting diagnostic helper + ten tests; **158 tests passed**
+  on **ap-dHrE0sEO0H7AgHv8jH7Opb**. Active generator/verifier/protocol code unchanged.
+- Prepared bounded **70-row** MAUD/TAT-QA calibration in
+  **/data/stage3-build-20260906/label-grounding-calibration-v1/** using
+  `data.prepare_label_grounding_calibration_modal`, CPU **ap-GcAHgc5IR85kzBGQlmyhcO**.
+  **18 MAUD + 52 TAT-QA**: up to eight/source/single-multi bucket, all six manually
+  labeled positive/negative controls, all 34 accounting candidates. Original row
+  bytes preserved. Candidate SHA **d4006192bc68b5c15e39c78b9da65216cb394d3af6f40fbf5d748e1a272992a9**;
+  accounting artifact SHA **1f823eb694678a6f1bc85d068b751cd3f4ce37eb588a06ffcd87c98e8b5d0c96**.
+  Controls/references must never enter judge/training prompts. Preparation only;
+  no diagnostic GPU generation/scale/release approval yet.
+- **Next:** extend this into a separately versioned diagnostic including both
+  corrected-MD controls (72 rows if simply adding those two). Test question-
+  conditioned label/claim grounding, requested dates/order, numeric thresholds,
+  signs and units. Do not reuse/tune away negative controls or modify the active
+  FaithDial/CLAPNQ V3 full reviewer. Require calibrated controls and new manual
+  checks before scaling the new review. Eventually materialize conservative
+  retained subsets separately with explicit exclusions and fresh audits; release
+  selection must replace each held source, never append generations. Original
+  base provenance/terms still block publication. No expansion export/packs/HF
+  release yet. Remaining main sources continue automatically after ACORD.
+
+## Historical checkpoint — 2026-09-08 04:33 EDT — V3 calibrated; full held-source review submitted
 
 - Main **ap-NT9cm8Mc78qaGB9euDnK99** remains active and unchanged: ACORD
   **34,300 attempts / 29,372 accepted**. Corrected MultiDoc2Dial

@@ -1,0 +1,30 @@
+{
+  "source": "multidoc2dial",
+  "status": "sample_review_failed",
+  "approved_for_release": false,
+  "scope": "Completed chronological regeneration and full format audit, but final manual samples reveal a numeric-boundary error. Hold until versioned correctness review; not a source-wide error-rate estimate.",
+  "attempted_traces": 21451,
+  "accepted_traces": 16158,
+  "corrected_tasks_sha256": "ed8c72b55cd790cdc009b60e59088174ba8dfd35fb9f4d76d594379e1b005649",
+  "generation_manifest_file_sha256": "b81c29ef08f7727f7f9ae5d91dead5d68fa10c7a4dd48b54881180e96cc0b6bd",
+  "accepted_file_sha256": "a99104742ebbe657963ba58cb976c0eb223c7fbc71b48ce7d060f8b389d44bfa",
+  "sample_artifact": "/data/stage3-agent/real-expansion/pilots/multidoc2dial-chronological-v1-full/manual-review-samples/multidoc2dial.json",
+  "reviewed_task_ids": ["rea4-md2d-873fbe82c90af128e0f9775e", "rea4-md2d-6dbabd8d53116f6cfd91c521"],
+  "reviewed_examples": [
+    {
+      "task_id": "rea4-md2d-873fbe82c90af128e0f9775e",
+      "category": "multi",
+      "result": "fail",
+      "evidence": "Chronology and current mandatory-certification question are correct. The answer adds dimensional thresholds using exceeding for width, length and height. The primary source says width exceeds 12 feet, but length is 80 feet or greater and height is 14 feet or greater. Thus the response changes inclusive length/height boundaries to strict ones. Both saved semantic votes passed despite this claim-level error. The license-suspension statement is separately supported.",
+      "remediation": "Use as a negative calibration control for exact threshold semantics; do not silently trim the sentence or change source facts. This is historical source-grounding review, not advice about current vehicle rules."
+    },
+    {
+      "task_id": "rea4-md2d-6dbabd8d53116f6cfd91c521",
+      "category": "single",
+      "result": "pass",
+      "evidence": "Answer responds to the current remaining-questions turn. The primary source's Still have questions section gives 1-800-772-1213, the local office alternative, TTY 1-800-325-0778 and 7 a.m. to 7 p.m. Monday-Friday. All final details match the supplied text; the unrelated student-aid padding is unused."
+    }
+  ],
+  "trajectory_checks": "Read chronological histories, current requests, task system, expand schema and native calls, complete observations and final answers. All 16,158 accepted rows passed exact-expansion, 512-token minimum and independent assistant-label checks; 24,389 calls and 6,187 multi-expansion traces. These format results do not override this failed semantic sample.",
+  "required_followup": "Preserve corrected full outputs and old V6 outputs. Add these positive/negative controls to a separate bounded question-grounding diagnostic covering MAUD scope, TAT-QA years/order/units and numeric thresholds. Require calibration/manual approval before full re-review; integrate only a reviewed source replacement, never append both generations."
+}
