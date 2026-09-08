@@ -18,6 +18,10 @@ def parse_judge_json(content):
         raise ValueError('Judge response requires boolean correct and grounded')
     return value
 
+def validate_pubmed_ids(task_ids, allowed, retry_subset=False):
+    if not task_ids <= allowed or (not retry_subset and task_ids != allowed):
+        raise RuntimeError('PubMedQA task shard is not the official training set/subset')
+
 def generate_all(client,model,revision,root,commit,reload=None,concurrency=32,
                  output_root=None,sources=None,pilot_limit=None,strict_semantics=False,
                  input_provenance=None, teacher_config=None):
@@ -84,10 +88,13 @@ def generate_all(client,model,revision,root,commit,reload=None,concurrency=32,
         from data.expansion_task_normalization import maud_field,prepare_teacher_task
         maud_choices={}
         if source=='maud':
-            with task_path.open() as stream:
-                for line in stream:
-                    task=json.loads(line)
-                    maud_choices.setdefault(maud_field(task),set()).add(task['gold_answer'])
+            if (input_provenance or {}).get('scope')=='not_previously_accepted':
+                maud_choices=json.loads((root/'maud-choices.json').read_text())
+            else:
+                with task_path.open() as stream:
+                    for line in stream:
+                        task=json.loads(line)
+                        maud_choices.setdefault(maud_field(task),set()).add(task['gold_answer'])
         completed=set();counts=Counter()
         for p in (accepted,rejected):
             if p.exists():
@@ -98,7 +105,8 @@ def generate_all(client,model,revision,root,commit,reload=None,concurrency=32,
             allowed=training_ids(split_manifest)
             with task_path.open() as stream:
                 task_ids={json.loads(line)['source_row_id'] for line in stream}
-            if task_ids!=allowed:raise RuntimeError('PubMedQA task shard is not the official training set')
+            validate_pubmed_ids(task_ids,allowed,retry_subset=(teacher_config is not None and
+                (input_provenance or {}).get('scope')=='not_previously_accepted'))
         def process(task):
             task=prepare_teacher_task(task,maud_choices)
             trace=None
@@ -152,6 +160,8 @@ def generate_all(client,model,revision,root,commit,reload=None,concurrency=32,
                 if teacher_config is not None:
                     trace['generation'].update(enable_thinking=False,teacher_config=teacher_config,
                                                requires_new_source_review=True)
+                if '_attempt_provenance' in task:
+                    trace['attempt_provenance']=task['_attempt_provenance']
                 return trace
             except Exception as exc:
                 failed={**(trace or {}),'task_id':task['task_id'],'source_dataset':task.get('source_dataset','synthetic'),
@@ -160,6 +170,8 @@ def generate_all(client,model,revision,root,commit,reload=None,concurrency=32,
                     failed.update(model=manifest['model'],model_revision=revision,
                                   generation={'enable_thinking':False,'teacher_config':teacher_config,
                                               'requires_new_source_review':True})
+                if '_attempt_provenance' in task:
+                    failed['attempt_provenance']=task['_attempt_provenance']
                 return failed
         processed=0;start=time.time()
         with task_path.open() as tasks,accepted.open('a') as out,rejected.open('a') as bad,ThreadPoolExecutor(max_workers=concurrency) as executor:

@@ -49,7 +49,34 @@ removed, while retaining its task and final-answer contract.
 Audit artifacts: `/data/stage3-build-20260906/qwen-format-audit/` and
 `/data/stage3-build-20260906/validation/` on the data volume.
 
-## Latest user request — 2026-09-08 — switch remaining generation to Qwen3.8-27B
+## Latest user request — 2026-09-08 — retry rejected/failed tasks with 27B
+
+- User explicitly requested one new27B attempt for rejected/failed traces in
+  addition to already authorized unattempted tasks. Keep prior candidates intact;
+  no relaxation of answer/evidence/format checks or source release holds.
+- Prior remaining-only call **fc-01M216DEKJDPYYC5PW1C8881N6 FAILED** before model
+  startup: `Previous teacher still writing or changed` in parent SHA check.
+  No generation-manifest or new traces existed in its output. Do not retry that
+  stale snapshot or restart235B. Both apps idle when inspected.
+- Preparing one combined, deduplicated v2 task set with15-source accounting:
+  rejected/failed selected parents + unattempted tasks, excluding prior accepted
+  IDs. Use corrected MultiDoc2Dial parent and corrected task IDs, NOT original MD.
+  Preserve v1 failed preparation and all previous teacher files. Fresh audit is
+  required because late persisted BillSum bytes changed after the earlier audit.
+- CPU preparation app **ap-brTkiYycynDSLoOgLccPrS**, local session **73104**:
+  **67 tests passed**, per-source audit/preparation running. New module
+  **data.generate_qwen38_retry_modal**, app **lclm-qwen38-retry-and-remaining-v2**.
+  New task root **/data/stage3-agent/real-expansion/pilots/retry-and-remaining-qwen38-27b-v2-tasks**;
+  output root same parent **retry-and-remaining-qwen38-27b-v2**.
+  Do not duplicate prep. No new v2 GPU generation submitted yet.
+- Retry-safe MAUD handling preserves the complete original label ontology, not
+  only labels occurring in rejected rows. PubMedQA retry subsets must stay inside
+  the official450 training IDs; original full-source coverage guard unchanged.
+  Per-row attempt provenance is metadata, never included in training messages.
+  Final composition must union prior accepted candidates with successful retries
+  by task ID, respecting correctedMD replacement and all existing review gates.
+
+## Previous user request — 2026-09-08 — switch remaining generation to Qwen3.8-27B
 
 - **15:03 EDT continuation:** CPU preparation completed successfully. Immutable
   transition manifest SHA256:
