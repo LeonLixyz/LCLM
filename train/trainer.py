@@ -786,6 +786,11 @@ class LCLMTrainer:
             for group_index, group_name in group_info
             if group_name in {"Embedder", "Adapter"}
         }
+        # Keep the group identity through DeepSpeed's flattened/master-parameter
+        # transformations, including its temporary per-subgroup optimizer lists.
+        from train.deepspeed_step import COMPRESSION_GROUP
+        for index, group in enumerate(self.optimizer.param_groups):
+            group[COMPRESSION_GROUP] = index in self._compression_param_group_indices
         
         # Log what we're doing
         self.accelerator.print(f"Using {self.training_args.scheduler_type} scheduler for all parameter groups:")
@@ -801,6 +806,11 @@ class LCLMTrainer:
         """Prepare model, optimizer, scheduler, and dataloaders with accelerator."""
         from torch.utils.data import IterableDataset
         is_iterable = isinstance(self.train_dataloader.dataset, IterableDataset)
+
+        plugin = self.accelerator.state.deepspeed_plugin
+        if plugin is not None:
+            from train.deepspeed_step import validate_zero_stage
+            validate_zero_stage(plugin.zero_stage)
 
         if is_iterable:
             # For IterableDataset (dynamic packing with StatefulDataLoader):
@@ -828,6 +838,14 @@ class LCLMTrainer:
         # Load checkpoint if auto-resume is enabled
         if self.auto_resume_checkpoint_path is not None:
             self._load_auto_resume_checkpoint()
+
+        self._deepspeed_step = None
+        if self.accelerator.distributed_type.name == "DEEPSPEED":
+            from train.deepspeed_step import COMPRESSION_GROUP, DeepSpeedStep
+            # Reapply metadata after restoring an older optimizer checkpoint.
+            for index, group in enumerate(self.model.basic_optimizer.param_groups):
+                group[COMPRESSION_GROUP] = index in self._compression_param_group_indices
+            self._deepspeed_step = DeepSpeedStep(self.model, self.accelerator)
 
         # Print FSDP structure for debugging
         # if self.training_args.distributed_type == "fsdp":
@@ -1212,7 +1230,7 @@ class LCLMTrainer:
                     "train/loss": loss_value,
                     "train/loss_running_avg": running_avg_loss,
                     "train/step": self.global_step,
-                    "train/compression_ratio": self.model.encoder.compression_ratio,
+                    "train/compression_ratio": self.training_args.compression_ratio,
                     "train/skipped": 0,
                 }
 
@@ -1388,12 +1406,15 @@ class LCLMTrainer:
             )
 
             self.accelerator.print(
-                f"[Step {step}] compression_ratio={self.model.encoder.compression_ratio}, "
+                f"[Step {step}] compression_ratio={self.training_args.compression_ratio}, "
                 f"batch_size={batch_size}, seq_len={seq_len}, num_regions={num_regions}, "
                 f"total_embed_tokens={total_embed_tokens}, total_memory_tokens={total_chunks}"
             )
 
         # If sample_lens is not None, we are using packed training, otherwise we are using regular training
+        deepspeed_step = getattr(self, "_deepspeed_step", None)
+        if deepspeed_step is not None:
+            deepspeed_step.begin_microbatch()
         outputs = self.model(**batch, sample_lens=sample_lens)
         loss = outputs.loss
 
@@ -1420,6 +1441,20 @@ class LCLMTrainer:
         # print(f"[DEBUG Step {step}] Forward done, loss={loss.item():.4f}")
 
         # self.accelerator.print(f"Loss: {loss}")
+        if deepspeed_step is not None:
+            valid = deepspeed_step.backward_and_step(
+                loss, local_has_memory=self._optimizer_step_has_memory)
+            if self.accelerator.sync_gradients:
+                if deepspeed_step.last_step_applied:
+                    # DeepSpeed-owned schedulers are no-ops through this wrapper;
+                    # externally owned schedulers still need one explicit call.
+                    self.scheduler.step()
+                self._optimizer_step_has_memory = False
+            if not valid:
+                self.accelerator.print(f"[Step {self.global_step}] Non-finite DeepSpeed window rejected before update.")
+                return None
+            return loss.item()
+
         self.accelerator.backward(loss)
 
         # DEBUG: Sync and check after backward
@@ -1435,12 +1470,11 @@ class LCLMTrainer:
         # torch.cuda.synchronize()
         # print(f"[DEBUG Step {step}] Grad check done")
 
-        # Check for non-finite loss and gradients
-        # Only check gradients when loss is non-finite to avoid expensive full parameter sweep
-        if not torch.isfinite(loss).item():
-            non_finite_any = has_non_finite_loss_and_gradients(loss=loss, model=self.model, accelerator=self.accelerator)
-        else:
-            non_finite_any = False
+        # All ranks must participate, including ranks with finite local loss.
+        # Finite loss can also produce non-finite gradients during backward.
+        non_finite_any = has_non_finite_loss_and_gradients(
+            loss=loss, model=self.model, accelerator=self.accelerator
+        )
         
         if non_finite_any:
             skip_nan_grad_step = True

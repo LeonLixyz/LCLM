@@ -7,6 +7,16 @@ in place of the original tokens.
 
 🤗 [Checkpoints](https://huggingface.co/latent-context) · [Eval datasets](https://huggingface.co/datasets/latent-context/lclm-eval)
 
+## Stage-3 training (`train` branch)
+
+Read the root [AGENTS.md](AGENTS.md) for training configuration, launch commands,
+and the verified scope of the ZeRO-2 fixes. The [dataset handoff](HF_PUBLICATION_20260911.md)
+contains pinned download instructions for the public
+[raw examples](https://huggingface.co/datasets/leonli66/stage3-final-mixture-20260910-raw)
+and [packed 16k/32k sequences](https://huggingface.co/datasets/leonli66/stage3-final-mixture-20260910-packed).
+Use one packed length per run. Multi-node/RDMA and full model/optimizer checkpoint
+restore still require validation on the target topology.
+
 ## Install
 
 ```bash

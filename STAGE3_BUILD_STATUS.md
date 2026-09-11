@@ -1,7 +1,537 @@
 # Stage-3 rebuild — 2026-09-06
 
-Work branch: `codex/stage3-full-20260906` on `LeonLixyz/LCLM`.
-This is an in-progress build, **not a completed dataset release**.
+Work branch: `train` on `LeonLixyz/LCLM` (renamed from `codex/stage3-full-20260906`).
+The reviewed build is **complete, trainable in the validated setup, and uploaded
+publicly to Hugging Face**.
+
+## Latest publication — 2026-09-11 06:54 UTC / 02:54 Eastern
+
+Both requested datasets are public and verified under `leonli66`, including
+anonymous access. Training instructions live in the root `AGENTS.md` and are
+linked from the repository README. The code branch is now named `train`.
+
+- [Raw](https://huggingface.co/datasets/leonli66/stage3-final-mixture-20260910-raw):
+  21,722,787 rows; revision `f72b2fafa7dec00c03b272b24bc83c4c27db6bc3`.
+- [Packed](https://huggingface.co/datasets/leonli66/stage3-final-mixture-20260910-packed):
+  2,278,921 sequences at 16k and 1,277,010 at 32k; revision
+  `f46f4124d6c602ec74d931d6999def02b6d9e7bb`.
+
+All 9,746 inventory files (9,680 Parquet) matched frozen sizes and content hashes;
+both completion markers are `complete`, and no `state.json` is included. The
+upload app is stopped. See `HF_PUBLICATION_20260911.md` for download instructions
+and final evidence. Root `AGENTS.md` now points to the verified HF snapshots.
+Multi-node/RDMA and full model/optimizer checkpoint restore remain unverified.
+The dated entries below preserve build history, including pre-publication status.
+
+## Latest verification — 2026-09-10 19:36 UTC / 15:36 Eastern
+
+Both 16k/32k variants are now globally shuffled with native and expanded agents
+mixed among reasoning and other sequences, while each sequence stays within one
+category. Counts remain 2,278,921 / 1,277,010 sequences. New training root:
+`/data/stage3-build-20260906/global-shuffle-20260910-v2/packed-cs16-{16384,32768}`.
+All shuffle positions and payloads, original source bindings, final loaders and
+8-rank category mixing checks passed. See `STAGE3_PACKED_DATA_20260910.md` for the
+current training paths and hashes; the older paths below are provenance.
+
+An actual rank-conditional NCCL collective bug in non-finite checks was fixed.
+44 regression tests, 8-rank DDP/FSDP stress tests and real 16k/32k pretrained
+4B-decoder/0.6B-encoder training updates passed on Modal H200:8. Validation applies
+to this LCLM clone and the tested single-node FSDP configuration. The follow-up
+DeepSpeed optimizer fix passed its matrix and full-model ZeRO-2 at both lengths;
+the user confirmed ZeRO-2 at most. ZeRO-3 experimental encoder/model changes and
+tests were removed, and training/validation now reject stages above ZeRO-2. The
+earlier ZeRO-3 investigation is not a blocker for this build. The
+separate Code-LLaVA checkout and multi-node setup are not validated. See
+`TRAINING_READINESS_20260910.md` and `DEEPSPEED_ORDERING_20260910.md` for scope and
+evidence. No production training or public dataset upload was launched.
+
+Root `AGENTS.md` now documents how to configure and launch the validated ZeRO-2
+path. A launcher correction makes the default global process count equal to
+nodes times GPUs per node; eight CPU-only launch checks passed. Multi-node GPU,
+network transport and full checkpoint restore are still unverified. The final
+16k/32k packs remain on Modal, with the HF destination/visibility requested from
+the user. Working-tree fixes and instructions have not been committed or pushed.
+
+## Latest request — 2026-09-09 — resume 27B pilot and build separate 16k/32k packs
+
+- **Completed checkpoint, 2026-09-10 18:32 UTC /14:32 Eastern:** the full reviewed
+  internal build is complete. Both manifests include the reviewed expansion
+  union, all byte digests passed, and actual loader checks passed.16k:
+  **2,278,921 sequences /21,463,686 examples**;
+  32k: **1,277,010 sequences /21,669,429 examples**.
+  Agent totals273,564/159,428; reasoning712,993/465,966; other1,292,364/651,616.
+- Reviewed expansion union152,503 examples is fully exported; all16 append
+  partitions and finalizer completed.16k keeps152,498 (five whole overlength
+  exclusions) in23,919 new sequences;32k keepsall152,503 in11,703 sequences.
+  Corrected-Lex native/token/label audit passed all70,343 rows with zero failures.
+  Both generation coordinators, recovery export and completion chains are done.
+- Final manifests:16k `8cf25be8aa2412a7f18447c8d5d3076ac8ff8b22b34f96182d7fa5fa164bf6c4`;
+  32k `aacb4d29c6dec1096fab24a388fbb0df52119cabea987c4a10d3c341cb6d2dac`.
+  Completion SHA `71d6e841927279d8a2986f8394c969f0f9701c0a1d794153e606fbf4688c13ae`.
+  Actual artifacts are saved under `_modal_run/final-packing-20260910/`.
+  See `STAGE3_PACKED_DATA_20260910.md` for training roots and category counts.
+  No requested build work remains within the reviewed source/configuration plan;
+  held pools remain excluded. No HF upload or model training was started.
+
+
+- **Earlier checkpoint, 2026-09-10 16:44 UTC /12:44 Eastern:** recovery selection
+  completed:123,421 results,84,928 automatic accepts,14,585 excluded accepts,
+  **70,343 eligible LexGLUE traces**. Recovery export is active and has written
+  seven of approximately36 Parquet shards (~14k rows). Selection committed at
+  16:19 UTC; recent2,000-row shards take roughly3–4minutes. Export alone projects
+  roughly another1.5–2hours if this rate holds, then actual tokenizer/label audits,
+  retained-stream union and16k/32k append remain. Working overall estimate:
+  **18:00–22:00 Eastern Sep10**, explicitly provisional until the remaining CPU
+  stages are measured. Previous ETA underestimated sequential verification/export.
+- Freshly read base manifests still show complete/byte-verified and no expansion
+  append yet. Category sequence counts16k/32k: native agents249,645/147,725;
+  reasoning712,993/465,966; other1,292,364/651,616. Totals2,255,002/1,265,307.
+  These packs are already usable and do not wait on expansion. Main new expansion
+  export remains complete22,627 rows; its final append waits on corrected Lex.
+  Snapshot: `_modal_run/live-packing-eta-latest.json`.
+
+
+- **Earlier checkpoint, 2026-09-10 16:06 UTC:** recovery's exact-input CPU gate
+  passed, and root's recorded launcher completed. New Lex selection/export
+  `fc-01M261336XKVG6738KXTQZWZND` and reconnected original completion coordinator
+  `fc-01M261351DC0KXQ693J1VCXR68` are both confirmed active. Chain state is
+  recovering_selection_export with no error. Old failed owner/state are archived;
+  only the terminal failed child call was rebound, preserving original arguments.
+  Recovery review SHA `5b533ba704e979f910ba1e5aea13fc76686776bcf113a06aa14955bb91dd5f69`. No model generation is rerun.
+  The main chain remains active awaiting this corrected-Lex readiness.
+
+
+- **Earlier checkpoint, 2026-09-10 16:06 UTC /12:06 Eastern:** both generation
+  terminal reports now completed their final checksum accounting. Main61,502
+  attempts /26,406 accepts; selected LexGLUE123,421 /84,928. Lex terminal SHA
+  `405aa1ff9e1db7018441624c312755a48cf02188e23bb5761e7c83b1d998f28f`.
+  No remaining model-generation tasks in the approved plans.
+- Main strict export is complete:22,627 filtered rows in12 Parquet shards;
+  manifest SHA `884da4750d82e7867d8dd816fdec5b5e2a6afcc5c810fc07485a7e5260a4c3cd`.
+  Main chain is correctly waiting_reviewed_additional_sources.
+- Corrected LexGLUE selection/export failed after a platform worker restart:
+  original worker `fc-01M25VH9H3F0C0GJCFMR19PVA3` and completion coordinator
+  `fc-01M23CHSD69R8F86WE1S49CAGZ` are confirmed terminal with
+  `Unrelated incomplete export owner`. The owner equality included the retry
+  timestamp suffix of the same logical input. No completed Lex selection/export
+  marker exists; generated data and original decisions are intact.
+- CPU-only execution recovery app `lclm-lexglue-export-recovery-20260910-v4`
+  uses a fresh immutable snapshot, stable same-call/logical-input ownership,
+  and bounded16-thread/32-pending frozen reads. Original audited source files
+  stay byte-identical; only the explicit read operations in the execution bodies
+  change. All original selection/quality/native/raw/prompt checks remain.
+  Recovery is bound as an additional artifact, without rewriting prior selections.
+  Tests:38 passed2.29s on Modal `fc-01M2610RP4XB040PJKGH9J2258`; includes
+  byte-identical exported shards, preserved exclusion/ID counts, corrupted
+  rejected-record detection, and idempotent immutable recovery lineage.
+- Root recovery launcher `_modal_run/resume_lexglue_export.py` is active, local
+  exec99856. Exact-input CPU gate `fc-01M2611KXKQB2HQSK1C2E0MX54` precedes
+  recorded worker dispatch and rebind of the original completion coordinator.
+  Actual submissions will appear in
+  `_modal_run/lexglue-selected-v5/recovery/launch-summary.json`.
+  Do not repeat or infer completion from this checkpoint. No generation rerun.
+  Final updated16k/32k packs remain pending; original packs are still trainable.
+
+
+- **Earlier checkpoint, 2026-09-10 03:39 UTC /Sep9 23:39 Eastern:** main
+  generation is complete:61,502/61,502 attempts and26,406 automatic accepts.
+  Bound terminal SHA `0c923e6fc654314e59806833cbd3a79551a1d34f930a7dd6455106b3d8834056`.
+  Synthetic continuation alone:9,916/9,936 automatic accepts.
+- Corrected LexGLUE all244 saved chunk reports cover123,421 completed attempts
+  and84,928 automatic accepts. Cached coordinator totals omit the510 attempts /
+  394 accepts in reused chunk238 after restart; root verified its exact stored
+  report hash against state to reconcile this read-only status. No new generation
+  is missing. The generation coordinator is still active in final byte verification;
+  its terminal completion report/readiness is not yet published. Actual call get
+  remains active even though graph labels contain an earlier failed platform input.
+- Main freeze-selection stage completed and chose22,627 examples, including the
+  separate source probes, after repeat/manual filters. Strict export child
+  `fc-01M24CE3RFJWT6SNWPHXEQ2XGY` is active; it still validates raw captures,
+  prompt/native identity and lineage before publishing transport. Parent status
+  label still says waiting_base_manifests but completed child bindings confirm
+  both exact base manifests were loaded and export has started. This is stale
+  progress labeling, not a base packing failure.
+- New traces are not yet in the final16k/32k packs. Both original base/native
+  variants remain complete/trainable. Final byte validation and strict export
+  have taken longer than the provisional CPU allowance; do not promise a new
+  finish time until actual remaining progress is known. Live snapshot:
+  `_modal_run/live-status-latest.json`.
+
+
+- **Earlier checkpoint, 17:21 UTC /13:21 Eastern:** main has43,436/61,502
+  complete attempts and17,723 automatic accepts; corrected LexGLUE has
+  14,912/123,421 and10,221 accepts, plus432 in-flight attempts. Both running.
+  Rates over the latest62minutes are about10.5k/main and10.4k/Lex tasks/hour.
+  Main generation projects~1.7h remaining; Lex~10.4h. Communicated ranges:
+  main~2h, Lex~10–12h, fully filtered/audited/appended packs~12–15h from this
+  checkpoint if throughput holds. The latter includes a provisional allowance
+  for CPU checks/export/packing; that remaining full-data stage is not yet timed.
+  Existing base/native packs are already trainable. Exact rate inputs are
+  `_modal_run/live-eta-20260909.json` and the16:19 snapshot.
+
+
+- **Earlier checkpoint, 16:19 UTC:** both generation jobs are active and have
+  fresh in-flight result progress. Main continuation:32,601 completed attempts
+  across77 complete chunks of61,502 planned;12,524 automatic accepts. Its current
+  MAUD chunk adds64 in-flight completions /11 accepts beyond those durable totals.
+  Procedural synthetic within the completed main chunks:4,135 attempts /4,127
+  automatic accepts. Counts are before final repeat/manual/export checks.
+- Selected corrected LexGLUE preparation and both actual CPU gates succeeded.
+  Exact selected manifest SHA:
+  `53416eaaa5367e4ef31707d5534e2744b635cdef29e2bc8490bc073d532c8f99`.
+  Continuation decision SHA:
+  `71d4a5fd9860124ceb320be32fbee9c365c78686d731c2d9ee28f13ce199adfc`.
+  Generation `fc-01M23CHS7754139BJ2QXNXP2B0` is active:4,160 completed of123,421
+  selected tasks,2,839 automatic accepts, plus80 in-flight completions /61 accepts
+  in chunk10. Its finite completion `fc-01M23CHSD69R8F86WE1S49CAGZ` is active
+  and waiting on that generation. The recorded local launcher has completed.
+- Main packing chain `fc-01M23B44TWGNS4JRB86HV11T2D` is active and waiting
+  on main generation; corrected-Lex readiness is not published yet. Neither new
+  stream has reached final export/append. Existing audited16k/32k base/native
+  packs remain complete and trainable with2,255,002 /1,265,307 sequences.
+  Durable live snapshot: `_modal_run/live-status-20260909-1619.json`.
+
+
+- **Earlier checkpoint, 15:12 UTC:** main recovery has an allocated GPU container;
+  ACORD chunk7 is warming and has not yet published fresh progress. Preserved
+  counts remain24,478 attempts /8,636 automatic accepts. Main packing chain
+  is live and correctly waits on the repaired generation call.
+- The five-config LexGLUE continuation and separate completion apps are deployed
+  from `/tmp/lclm-selected-lexglue-20260909-v5-frozen`, with every returned runtime
+  code hash checked against the snapshot and reviewed working files. Generation
+  tests:44 passed1.40s (`fc-01M23BED181PQAJRJQBZCYV9ZB`); completion tests:
+  34 passed1.68s (`fc-01M23BED685V4WM1DEKW6TX31Z`). Generation app
+  `ap-RFeqiqlXNV3Sk9jHzaAU9N`; completion app `ap-4hpz4wLHBdAKGhkKLvtoA3`.
+  This fixes advisory progress parsing without changing serving/prompt/validators.
+- Root's bounded config review is frozen, SHA
+  `d3650fc850cd25f7214352290efdd210aece984a8d7455a94596678f4c555542`.
+  Selection SHA `d07210a4fda05d13d2582f55054885c3f368332df0160a91919ae40639b1a5ae`
+  approves CaseHOLD/ECHR-A/LEDGAR/SCOTUS/UNFAIR-ToS only. Preparation call
+  `fc-01M23BHTXZM1FT1D3VNHE9A7VT` is active, with28 children confirmed complete
+  at15:11. The exact plan selects123,421 unattempted corrected tasks, holds62,959
+  ECHR-B/EURLEX tasks, and preserves all64 canaries as diagnostics only.
+  Preparation must verify every parent ID and original corrected input-line byte.
+- `_modal_run/launch_selected_lexglue.py` is running in local exec session19787.
+  It waits for actual preparation, validates exact selected/held/canary counts,
+  binds the actual manifest and tested configurations, runs both CPU gates,
+  then submits recorded generation and finite internal completion calls. Do not
+  duplicate this process or dispatch based solely on this checkpoint. The actual
+  call IDs and results appear under `_modal_run/lexglue-selected-v5/`, ending in
+  `launch-summary.json` only after both submissions succeed. New generation is
+  not yet dispatched at this checkpoint. Main policy/exclusion bytes are unchanged.
+
+
+- **Earlier checkpoint, 15:05 UTC:** both base/native variants are verified complete
+  and trainable. 16k: **2,255,002 sequences**, manifest SHA
+  `82f8e84b38e331b2f267f4654a09b7c37aec110ce20777504385be5f3372bd3a`;
+  32k: **1,265,307 sequences**, manifest SHA
+  `1d6e63a20b9eeee82d02a91f3cce8f3bb2226d766828f994170af88ebbc0e314`.
+  All64 byte-audit certificates passed across6,940 shards; actual loader checks
+  passed. Sequences are category-pure and shuffled after packing. New expansion
+  traces are not included yet. Correct overlength exclusions are247,198/41,460
+  for16k/32k; each additionally excludes11,897 under18-token examples and one
+  processing rejection. Historical provisional totals below included all three
+  exclusion reasons and must not be read as overlength-only.
+- The original main generation coordinator failed around09:05 UTC while reading
+  a partially written advisory progress JSON. Its final GPU child still finished;
+  **24,478 attempts /8,636 automatic accepts** across61 completed chunks are
+  preserved. Root's CPU-only recovery passed8 Modal tests and exact preflight;
+  the original GPU implementation, prompts, model, inputs and review are unchanged.
+  Recovery call `fc-01M23B42EH52PQ02G68QJBA0JQ` on app
+  `ap-qtFu4WuqK8xTNljjHfaAcZ` has dispatched ACORD chunk7, child
+  `fc-01M23B72A4DQTBSVMMY7WP3XV5`, for the remaining37,024 tasks.
+  The unchanged packing policy is reconnected via new chain call
+  `fc-01M23B44TWGNS4JRB86HV11T2D`, confirmed waiting on this recovery.
+  Old terminal errors and pre-recovery state are archived, not erased.
+- Corrected LexGLUE64 completed:29 automatic accepts,22 after the repeat filter,
+  versus9 accepts with the original opaque task definitions. Every raw/prompt/
+  native/token/label check passed. Counts by config are CaseHOLD7/10,
+  ECHR-A4/9, ECHR-B0/9, EURLEX0/9, LEDGAR7/9, SCOTUS3/9, UNFAIR-ToS8/9.
+  ECHR-B/EURLEX remain held; source evidence for the other five is reviewed.
+  A config-selective continuation is implemented but has not been deployed or
+  launched at this checkpoint. All64 canaries will remain diagnostics only.
+  Main expansion append still requires corrected-Lex readiness.
+  See `_modal_run/coordinator-recovery-v2/` and
+  `_modal_run/grouped-packing-final/` for durable status artifacts.
+
+
+- **Earlier checkpoint, 07:46 UTC:** corrected LexGLUE64 canary is submitted:
+  `fc-01M22J2W90VRC7SAMWB3690T79`, decision
+  `bdcaa350a220b8909b6290773581007e7689532d536fb4c7df7e9982a0b14861`.
+  Its exact corrected186,444-ID manifest SHA is
+  `c90e0f49da167c97ccba5d9ceac1f80d659d0661f0785e2828d5a0c7a1c5f860`.
+  Preparation preserved45,000 CaseHOLD prompts and amended141,444 other tasks
+  with reviewed definitions, preserving original gold and evidence. The separate
+  final1 CPU audit and per-config semantic review follow the actual canary.
+  No corrected-Lex continuation or packing approval has been issued yet.
+- Main61,502-task continuation is healthy. A checked intermediate snapshot has
+  652 completed /287 automatic accepts /652 valid expansion-call tasks across
+  all11 approved sources. These are intermediate generation counts before the
+  uniform repeat/manual/training filters.
+- Base/native64/64 packing is complete. Separate bounded16-worker checksum
+  app `ap-QLQRq0gNfWfz8Q345Slzc9`, coordinator
+  `fc-01M22J4J3G3KM6ZR362DNVGE94`, has replaced the slow serial final audit.
+  Its9 Modal CPU tests passed, including both actual loaders and the frozen
+  expansion-chain consumer. Old coordinator/finalizer are confirmed terminal;
+  publication checks single-writer ownership again. Exact output bytes and all
+  original category, length and aggregate checks remain unchanged. First16/64
+  partition certificates completed without checksum failures in about3minutes.
+
+- **Earlier checkpoint, 07:35 UTC:** root has launched the reviewed continuation:
+  **61,502 failed/unattempted tasks across11 sources**, call
+  `fc-01M22H5ZKSWDDDDYRZZA1NT3Z8` on app `ap-PaoTiXTzZGxtSdAQolzarg`.
+  Frozen decision SHA `e0dbab13a9cab459721d1e7eee8b703c11e492ec798353aa14b8f233c4f1336a`.
+  BillSum and current-config MultiHierTT remain held; corrected LexGLUE is
+  separately prepared and must pass its new-version canary before continuation.
+- The finite internal packing chain is submitted, call
+  `fc-01M22HA3MSRKH3PB70D4W0P3ZR`, app `ap-u4ZjAD2xxHXtqtWxXRNvQG`.
+  Its actual root policy passed `valid_root_policy`; SHA
+  `6abe018e76b4fb649cd365e6aac3c15fe543394ee3378874b5f83e8a9437e080`.
+  It waits for actual generation completion, both audited base manifests and
+  independently reviewed corrected-Lex readiness, then runs strict filtering,
+  export and category-pure16k/32k append. No production export has finished.
+  Selected retained235B pools contain59,579 candidates before quality filters;
+  the1k27B pilot has326 eligible rows after repeat/manual/BillSum exclusions.
+- Base/native packing has completed64/64 partitions. The isolated partition51
+  repair succeeded in944seconds with unchanged tokenization/category semantics.
+  Original finalizer `fc-01M22HM0HEAJWQP4PF16GBF4ZB` on
+  `ap-6wcNzANRV21Rq14PbU8m5H` is verifying every output byte digest, aggregate
+  category/length/count bounds and both actual loader variants. Both final
+  manifests remain pending until this audit succeeds.
+  Provisional report totals:16k2,255,002 sequences /21,311,188 examples;
+  32k1,265,307 sequences /21,516,926 examples. Full audit covers322.67GiB
+  across6,940 shards. Whole-example overlength exclusions:259,096 at16k,
+  53,358 at32k. These counts await final audit/manifests and exclude pending
+  reviewed expansion append.
+
+- **Earlier checkpoint, 07:25 UTC:** all896 source probes are complete
+  (64 original MAUD reused +832 on corrected storage), and all14 source
+  format/raw/nonthinking/accepted-label audits passed. The resumed coordinator
+  returned `approved_plan_complete`; terminal report SHA
+  `db5445e8af3060d5181a407201e9ebe8cb910789f61a3a66ec70b7452b53d484`.
+  The local collector hit a harmless timeout while the coordinator finished
+  its terminal hash inventory; the actual final result was then collected in
+  `_modal_run/storage-successor-v3/probes/generation-final.json`.
+- Procedural synthetic:64/64 accepts across all five families. Root independently
+  recomputed every answer from expanded record facts, without the generator's
+  answer helper;64/64 passed. Root source reviews for PubMed, CLAPNQ, FinQA,
+  MultiDoc2Dial, ACORD, FaithDial and synthetic are frozen alongside their
+  report/audit/bundles. Source-level approval is bounded review, not exhaustive
+  semantic correctness; exact-repeat and documented manual exclusions apply.
+- **BillSum held under this configuration:**5/64 automatic accepts; independent
+  review found a reversed section529 four-change limit, overgeneralized funding
+  restriction, and a foreclosure-condition concern. Three accepted traces also
+  repeat immutable evidence. Only one of five is both supported and unrepeated.
+  Do not launch its18,379 remaining current-config tasks or include BillSum in
+  this new internal packing selection. All existing attempts remain unchanged.
+- **Opaque LexGLUE held/replaced by a new task version:** original probe9/64
+  accepts (7 CaseHOLD,2 LEDGAR); numeric-label configs lacked definitions and
+  classification targets. Gold-independent correction
+  `lexglue-upstream-ontology-20260909-v1` passed31 CPU tests and all64 frozen
+  transform checks. Definitions SHA
+  `9fd5814221ddc80c087a6b6a07f78a0397bad0e662a2ef8703f11034d66f6c3e`.
+  A separate corrected-Lex app is being prepared for the same186,444 original
+  task IDs with explicit new input hashes; old results remain diagnostics.
+- Proposed retained235B training subset is the seven existing source-sample and
+  all-row-format-passed pools:59,579 candidates before repeat/manual filters.
+  Held old FaithDial/CLAPNQ/MAUD/TATQA/MultiDoc2Dial and partial unaudited BillSum
+  are preserved outside the new training selection. New27B source evidence does
+  not rehabilitate those old teacher pools. Frozen typed stream specifications:
+  `_modal_run/internal-packing-policy-v1/retained-streams.json`.
+- Finite completion app `ap-u4ZjAD2xxHXtqtWxXRNvQG` passed64 CPU tests and is
+  deployed inertly. It supports generation completion → strict export →
+  independently reviewed corrected-Lex readiness → one union →16k/32k append.
+  See `EXPANSION_COMPLETION_CHAIN_20260909_STATUS.md`; root source policy and
+  actual continuation dispatch are still required. No production export yet.
+- Base/native packing reached62/64. Partition63 remains healthy; partition51
+  had a lost multiprocessing worker and stalled. Only51's old call/container
+  was cancelled after preserving its snapshot. Isolated repair
+  `ap-Ee5nXMYhqQktqTeA1ZdxWQ`, call `fc-01M22GPR92WVC4FPHNY4QFPGYX`,
+  detects worker exits promptly and permits one bounded infrastructure retry.
+  Core tokenization/category/length behavior is unchanged. Both final manifests
+  still await all64 reports and complete integrity audits.
+
+- User resumed the 1,000-failure diagnostic with Qwen3.8-27B nonthinking. If the
+  pilot supports a useful improvement and faster generation, user authorizes
+  27B for both rejected/failed AND previously unattempted tasks. This supersedes
+  the earlier235B-first routing and the pause below. Preserve previous accepted
+  traces; strip thinking from training messages. Failed-only sampling cannot
+  establish overall teacher superiority; inspect recovery, speed and quality.
+- User also authorized parallel packing into category-pure sequences: agent
+  traces, reasoning, other. Shuffle completed sequences across those categories
+  at training time. Build both16,384 and32,768 versions with exact accounting;
+  keep existing artifacts intact. Packing progress will be documented in
+  `PACKING_20260909_STATUS.md`. New expansion outputs remain subject to existing
+  verification/grounding checks before becoming training data.
+- No outputs or final release should be called complete merely because a
+  deployment/submission succeeded. Record concrete app/call IDs and reports.
+- **Pilot completed:** app `ap-BUaV0szJvHyzEOabIrh6ef`, call
+  `fc-01M22BXTXBNY47DV45SZVCHWF7`. Frozen1,000-case manifest SHA256
+  `8f4845352decc8bed612302fac8d962d700d8206ad93404b5392bfdd8e663ce9`.
+  All13 failed-source preparations and tests passed. Runtime preflight confirms
+  SGLang `0.0.0.dev1+g5f55db35e`, transformers5.12.1, torch2.13.0+cu130,
+  OpenAI2.6.1, and pre-parser token capture support. Submitted once; inspect
+  this call and its saved output before any resubmission/redeployment.
+- Pilot result: **1,000/1,000 valid expansion calls;364 automatic accepts**,
+  **1,563.63 seconds** of generation/review (26m03.63s). Rejections include
+  169 whole-document support checks,76 final-line harvesting failures, and391
+  answer/semantic checks. No rollout/API/judge parsing error was recorded.
+  Result SHA256:
+  `417363d886f1afa02ceaf086125f51f73239082ff229b6101ae89816cd8a4e23`.
+  Source/reason weighting projects30.94% automatic recovery among old failures;
+  this is a verifier-yield estimate, not true accuracy or model superiority.
+- Local durable preparation/submission record:
+  `_modal_run/sglang_failed_1k_calls.json`. Deployment uses an immutable code
+  snapshot, avoiding image-build races with the parallel packing work.
+- Full available-data packing launched on `ap-6wcNzANRV21Rq14PbU8m5H`, call
+  `fc-01M22CD5A03YKF3RB02Q6WRJ3K`: 64 partitions, up to32 CPU containers,
+  both lengths from one raw tokenization pass. Preflight passed35 tests and
+  a512-row pilot passed the actual loader for both lengths. Output root:
+  `/data/stage3-build-20260906/grouped-packing-20260909-v3`.
+  Reasoning sources are `reasoning_data` and `dolci_think`; a347-row audit
+  across12 files established `nemotron_math_4plus` is passage reconstruction,
+  so it stays in other with existing content/compression. Whole overlength
+  trajectories are excluded with accounting, never truncated.
+- Initial27B source review:20 automatic accepts and10 rejects from first60;
+ 16 accepts supported, four have ambiguity/coverage/grounding caveats.
+  Several old235B "failures" already had correct answers but failed FINAL
+  formatting or judge JSON parsing. Several new numeric/support rejections
+  likewise are verifier artifacts. Full evidence is in
+  `_modal_run/pilot-quality-review.json`; this is not a population estimate.
+- Full raw-response/native-tool/assistant-label audit completed on
+  `lclm-sglang-failed-1k-audit-20260909-v1`, call
+  `fc-01M22DNG9A60CENWYWZQ2E8Z6Q`. All364 accepted traces passed exact
+  saved-prompt, native-call/body, tokenizer and independent loss-label checks.
+  All3,732 requests disabled thinking; zero response reasoning fields/markers.
+  The raw closing-tag counter flagged14 already-rejected cases. All were
+  classified from matching raw-capture hashes:12 extra XML calls after the
+ 16-call budget on requests with tools omitted, and2 orphan closing-tag finals.
+  Zero accepted rows are affected; no enabled-parser loss was demonstrated.
+  Preserve the raw audit warnings and rejections. Reports:
+  `_modal_run/pilot-final/independent-format-audit.json` and
+  `_modal_run/pilot-raw-mismatch-review.json`.
+- Separate serving smoke passed all128 captured first-turn replays, all with
+  valid native calls and zero parser/request/thinking-marker errors. Eight TP1
+  BF16 replicas with CUDA graphs produced127 requests in7.05s (18.00req/s,
+  572.26 completion tok/s), after671.9s staged cold startup. This is first-turn
+  throughput, not a matched full-task speedup. Smoke call
+  `fc-01M22CW9GQNK5X2ZFR0CGNC8D5`, report SHA256
+  `b548e5a5cd806e5b76645a89fd4bcce529fa4436d8993d372509f7ecf74abf13`.
+- Backlog v1 CPU preparation completed all273,183 additional IDs, excluding
+  all1,000 pilot IDs:66,088 old failures +207,095 unattempted. Manifest SHA256
+  `6f6f7f929e78901da9147439841ec70455b49869832c9e2a864c760ce633e873`.
+  Fast v2 is being prepared separately using immutable v1 chunk references,
+  balanced LexGLUE-config/synthetic-family probes, a continuous work queue,
+  and explicitly versioned teacher-only concise-answer/summary guidance.
+  Current1k pilot, stored training prompts, and validators remain unchanged.
+- Fast v2 preparation completed with manifest SHA256
+  `96584acb7b8ba93e45b79310c9793408aa7d5b18176880136db3ef511b5a3cfe`:
+  exact273,183 IDs =896 probes +272,287 continuation. All1,000 pilot attempts
+  and100,572 original accepted IDs are excluded. Root reviewed the completed
+  pilot, semantic samples, raw14 classification and serving smoke, then wrote
+  the probe-only decision SHA256
+  `fbb29de5edf2572c840a97f6955f39ad939abbe7f3508e347b654d240d53bbcd`.
+  CPU gate passed; 896 source probes launched on
+  `lclm-sglang27-backlog-fast-20260909-v2`, call
+  `fc-01M22EVC23780KBFQPQSQCX9DW`. Full continuation is not launched yet.
+  Local `_modal_run/fast-backlog-v2/probe-submission.json` is authoritative;
+  `_modal_run/watch_source_probes.py` collects results and starts read-only
+  per-source format/label audits as each finishes. Do not duplicate dispatch.
+- Full continuation needs separate Volume v2 output storage: the current
+  private input/probe volume is v1 and cannot fit the proposed per-task output
+  inode count. A storage-only successor is being prepared with exact v2 probe
+  lineage and unchanged serving/prompt/validators. Existing probes continue;
+  no probe regeneration or migration of immutable original inputs.
+- The original v2 source controller completed MAUD64 (32 automatic accepts),
+  then13 later sources failed at `volume.reload()` before any reservation or
+  model request because SGLang kept output logs open on the Volume. Root waited
+  for the terminal controller return and stopped app `ap-ytktCvOAnPqROQOi1HH7j0`.
+  MAUD's report SHA is
+  `93c0c696a01738888215147c5d45cc1c16ffc827cb92151d4defc7acecddf346`.
+  Its full32-accepted format/token/label audit passed; bounded semantic review
+  supports the six inspected answers but flags redundant expansion behavior.
+- Corrected storage successor `ap-PaoTiXTzZGxtSdAQolzarg` passed84 CPU tests.
+  New manifest SHA:
+  `16598d3f60dec5e4463fe1ce52a8802a1f90e1c7f997ac524aecea664005423b`.
+  Root's resume decision SHA:
+  `fbe381a3d604ddaaead552416abe585aa2d4bd16b6d19c9fc8a3e5f91018a729`.
+  Gate passed;832 untouched probes launched on
+  `lclm-sglang27-continuation-storage-20260909-v3`, call
+  `fc-01M22FQJ8MD14PK02JK6TR6PVM`. Reuse original MAUD64 without new requests.
+  New outputs: private Volume `lclm-stage3-agent-outputs-v2-20260909`, mounted
+  `/runs/stage3-build-20260906/sglang27-continuation-storage-20260909-v3`.
+  Live logs are local with closed-file durable snapshots. Full continuation
+  remains gated on actual source review. Local authoritative submission is
+  `_modal_run/storage-successor-v3/probe-submission.json`; the finite watcher
+  `_modal_run/watch_storage_probes.py` collects results and source-format audits.
+- Training-only expansion quality policy now excludes entire trajectories that
+  repeat the same immutable segment; it changes no original answer verdict or
+  raw attempt. Module `data/expansion_training_quality.py` passed3 Modal CPU
+  tests. In the1k pilot:364 automatic accepts,24 repeated-call exclusions and10
+  independent documented manual concerns leave330 eligible before final export.
+  Static review exclusions now also include2 MAUD probe efficiency cases; exact
+  overlap/count accounting is required. Typed235B/pilot/27B export adapters and
+  dual-length append adapter are implemented/tested, with no production export
+  or append launched. A finite completion chain is being connected under an
+  explicit internal-packing policy; no HF publication or training run.
+- Packing failures were confirmed **Modal preemptions followed by the STARTED
+  duplicate guard**, not a proven data or OOM error. General completion app
+  `ap-w8AV9badmWfSzYZQ4DhMLQ`, coordinator
+  `fc-01M22DXV1TJP5Q75NQJ8J3GG6N`, tracks active repair calls, retries missing
+  terminal partitions safely, and finalizes both lengths. Original map ended
+  with32 successes,3 failures and29 cancelled children. Completed outputs stay
+  intact; three earlier repairs plus13 new workers run within the16-worker
+  completion pool, with16 additional partitions queued. Dedicated packing
+  status has all repair IDs. Earlier idle completion v1 was cancelled before
+  it launched children.
+- Additional source evidence: `_modal_run/pilot-quality-review-late.json`
+  (12 new accepted examples) and `_modal_run/expansion-verifier-diagnosis.md`.
+  Whole-document support includes irrelevant padded tails; several financial
+  sources use token equality rather than native numeric metrics. Materialized
+  TATQA scale/type/derivation are empty. No speculative evidence pruning or
+  permissive numeric matching has been applied. Manual review also found real
+  deadline/eligibility grounding concerns, motivating the next prompt probes.
+
+## Historical paused diagnostic — superseded by resumed request above
+
+- **PAUSED by user:** User asked to stop while clarifying tokenization and pack
+  length. Stopped preparation app `ap-yMPc2K3GgDSHMMeqVVAkqQ` explicitly. No
+  1k GPU generation was submitted. Do not resume or launch until requested.
+  Current saved base/native packs target **32,768**, not **16,384**, decoder
+  tokens at reference compression ratio16. Decoder IDs/labels are pretokenized;
+  raw memory strings are encoder-tokenized at runtime. A16k repack is not done.
+- User requested a 1,000-task 27B pilot across expansion datasets, then explicitly
+  narrowed it to previously failed/rejected tasks. This is a bounded diagnostic,
+  not authorization to run the entire remaining backlog in this task.
+- Added `data.sglang_failed_1k_modal` and deterministic failed-only selection in
+  `data.expansion_retry_diagnostic`. Preparation app: `ap-yMPc2K3GgDSHMMeqVVAkqQ`.
+  At this checkpoint the pinned SGLang image is building; no GPU generation has
+  been submitted. Inspect existing app/output before submitting anything else.
+- Inputs come from the completed retry-v2 preparation; sources and old failure
+  reasons are balanced, with stable hash selection within each stratum. Corrected
+  MultiDoc2Dial is used. LexGLUE and procedural synthetic have no prior attempts,
+  so neither is eligible for this failed-only pilot.
+- Output: `/data/stage3-build-20260906/sglang-27b-failed-1k-20260909-v1` on
+  `lclm-stage3-data`. Teacher is pinned Qwen3.8-27B, nonthinking, recommended
+  sampling, 2,048 output tokens/turn, 16 tool calls, 32k context, H200:8.
+  SGLang image is digest-pinned; native parser is `qwen3_coder`. Full API
+  requests/responses and pre-parser generated token IDs/text are retained.
+- Same task prompts and production answer/evidence checks; distinguish rollout,
+  harvesting, rule-verification and judge failures. New teacher AND serving
+  engine means this does not isolate a pure engine effect. No release approval.
+- Fresh saved-parent accounting: 167,660 attempts = 100,572 automatic accepts +
+  67,088 rejects. Reject categories: 52,932 answer checks, 6,374 no tool call,
+  3,800 generic exceptions, 2,750 missing-support flags, 1,228 invalid segment-ID
+  arguments, 4 unknown segments. Generic exceptions include 2,043 JSON decode
+  failures; old logging does not fully distinguish model output from judge JSON.
+- Reconfirmed existing packed artifacts: base+recovery 20,286,582 rows; native
+  agents 1,230,344 rows. Separate component folders, no final combined release.
+  Existing 18-pack artifact audit and two-rank NCCL/FSDP checks passed; this is
+  sample/small-model validation, not a full production training run.
+- Full CoT rewrite validation covers 5,407,421 reasoning rows: 2,698,545 contain
+  CoT memory spans, 2,704,973 assigned uncompressed plus 3,903 short fallbacks
+  remain uncompressed. Reasoning prompts are preserved. 611,131 compressed
+  rows use a final-128-token fallback rather than an explicit answer boundary.
 
 ## Latest source requirement
 

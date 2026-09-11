@@ -1,0 +1,34 @@
+{
+  "packed": {
+    "all_sizes_and_content_hashes_match": true,
+    "anonymous_access_verified": true,
+    "bytes_verified": 352312448546,
+    "files_verified": 6980,
+    "kind": "packed",
+    "parquet_files": 6947,
+    "previous_private_revision": "c366a4734578db02d8f151d33f9d87d50b4247f4",
+    "private": false,
+    "public_release_authorized_at": "2026-09-11T06:54:10.844613+00:00",
+    "repo_id": "leonli66/stage3-final-mixture-20260910-packed",
+    "revision": "f46f4124d6c602ec74d931d6999def02b6d9e7bb",
+    "state_json_present": false,
+    "status": "complete",
+    "verified_payload_revision": "8ee2c492d6f497bbf86742538f02c3f9041f3fe5"
+  },
+  "raw": {
+    "all_sizes_and_content_hashes_match": true,
+    "anonymous_access_verified": true,
+    "bytes_verified": 180014880061,
+    "files_verified": 2766,
+    "kind": "raw",
+    "parquet_files": 2733,
+    "previous_private_revision": "6a608ed58622f7532b51f57439a6eb5919e2ccb7",
+    "private": false,
+    "public_release_authorized_at": "2026-09-11T06:54:05.014187+00:00",
+    "repo_id": "leonli66/stage3-final-mixture-20260910-raw",
+    "revision": "f72b2fafa7dec00c03b272b24bc83c4c27db6bc3",
+    "state_json_present": false,
+    "status": "complete",
+    "verified_payload_revision": "dec5d3ce9b87c7dfb0d521df07d29fd45765d739"
+  }
+}

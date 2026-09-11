@@ -11,6 +11,7 @@ from latent_context.model import LCLM
 from latent_context.encoder import Encoder
 from latent_context.adapter import Adapter
 from train.optimizer_utils import global_has_memory, clear_optimizer_group_grads
+from utils.nan_checks import has_non_finite_loss_and_gradients
 
 
 class Harness(torch.nn.Module):
@@ -76,6 +77,23 @@ def main():
                 assert all(torch.equal(a,b) for a,b in zip(before,harness.core.parameters()))
             dist.barrier()
             if rank==0:print(f'PASS NCCL {pattern}: loss={loss.item():.6f}',flush=True)
+        def reduce_flag(value, reduction):
+            assert reduction == 'sum'
+            dist.all_reduce(value, op=dist.ReduceOp.SUM)
+            return value
+        accelerator=SimpleNamespace(device=torch.device('cuda',rank), reduce=reduce_flag)
+        for bad in ('loss', 'gradient', 'neither'):
+            opt.zero_grad(set_to_none=True)
+            loss=model(rank == 0)
+            loss.backward()
+            checked_loss=loss.detach().clone()
+            if rank==0 and bad=='loss':checked_loss.fill_(float('nan'))
+            if rank==0 and bad=='gradient':
+                next(p for p in model.parameters() if p.grad is not None and p.grad.numel()).grad.fill_(float('inf'))
+            found=has_non_finite_loss_and_gradients(loss=checked_loss,model=model,accelerator=accelerator)
+            assert found == (bad != 'neither')
+            dist.barrier()
+            if rank==0:print(f'PASS synchronized non-finite check: {bad}',flush=True)
     finally:
         dist.destroy_process_group()
 

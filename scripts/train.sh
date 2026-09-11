@@ -35,12 +35,32 @@ MASTER_PORT="${MASTER_PORT:-29500}"
 NUM_MACHINES="${NUM_MACHINES:-1}"
 MACHINE_RANK="${MACHINE_RANK:-0}"
 
-# Auto-detect GPUs if not set
-if [ -z "${WORLD_SIZE:-}" ]; then
-    WORLD_SIZE=$(python -c "import torch; print(torch.cuda.device_count())" 2>/dev/null || echo 1)
-fi
+# Detect local capacity before calculating the global process count.
 if [ -z "${GPUS_PER_NODE:-}" ]; then
     GPUS_PER_NODE=$(python -c "import torch; print(torch.cuda.device_count())" 2>/dev/null || echo 1)
+fi
+
+require_positive_int() {
+    if ! [[ "$2" =~ ^[1-9][0-9]*$ ]]; then
+        echo "$1 must be a positive integer (got '$2')" >&2
+        exit 2
+    fi
+}
+require_positive_int NUM_MACHINES "$NUM_MACHINES"
+require_positive_int GPUS_PER_NODE "$GPUS_PER_NODE"
+WORLD_SIZE="${WORLD_SIZE:-$((NUM_MACHINES * GPUS_PER_NODE))}"
+require_positive_int WORLD_SIZE "$WORLD_SIZE"
+if (( WORLD_SIZE % NUM_MACHINES != 0 )); then
+    echo "WORLD_SIZE must be divisible by NUM_MACHINES" >&2
+    exit 2
+fi
+if ! [[ "$MACHINE_RANK" =~ ^(0|[1-9][0-9]*)$ ]] || (( MACHINE_RANK >= NUM_MACHINES )); then
+    echo "MACHINE_RANK must be between 0 and NUM_MACHINES - 1" >&2
+    exit 2
+fi
+if (( NUM_MACHINES > 1 )) && [[ "$MASTER_ADDR" == localhost || "$MASTER_ADDR" == 127.0.0.1 || "$MASTER_ADDR" == ::1 ]]; then
+    echo "Set MASTER_ADDR to a rank-0 address reachable from every node" >&2
+    exit 2
 fi
 
 # Optional env vars
