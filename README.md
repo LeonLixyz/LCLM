@@ -10,7 +10,7 @@ in place of the original tokens.
 ## Stage-3 training (`train` branch)
 
 Read the root [AGENTS.md](AGENTS.md) for training configuration, launch commands,
-and the verified scope of the ZeRO-2 fixes. The [dataset handoff](HF_PUBLICATION_20260911.md)
+and the verified scope of the ZeRO-2 fixes. The [dataset guide](docs/data.md)
 contains pinned download instructions for the public
 [raw examples](https://huggingface.co/datasets/leonli66/stage3-final-mixture-20260910-raw)
 and [packed 16k/32k sequences](https://huggingface.co/datasets/leonli66/stage3-final-mixture-20260910-packed).
@@ -20,7 +20,7 @@ restore still require validation on the target topology.
 ## Install
 
 ```bash
-git clone https://github.com/LeonLixyz/LCLM && cd LCLM
+git clone --branch train https://github.com/LeonLixyz/LCLM && cd LCLM
 curl -LsSf https://astral.sh/uv/install.sh | sh
 uv sync
 # If flash-attn fails to build:
@@ -51,7 +51,8 @@ LCLM/
 │   ├── pretrain_config/   #   pretrain-stage YAMLs
 │   └── distributed_configs/  # accelerate / deepspeed / fsdp
 ├── agent/                 # Agent app — EXPAND(i) tool over compressed segments.
-├── data/                  # Training datasets, collators, dynamic packing.
+├── data/                  # Runtime datasets, collators and packing utilities.
+├── docs/                  # Current training/data guides and verification record.
 └── utils/                 # Helpers + checkpoint-conversion shell scripts.
 ```
 
@@ -107,7 +108,7 @@ OUTPUT_DIR=./checkpoints bash scripts/run_pipeline.sh \
 |---|---|
 | `scripts/experiment_config/` | Full end-to-end runs. Naming: `{enc}-{dec}-cs{N}-{pooling}-w{W}-{mask}-{adapter}-O{O}.yaml` — e.g. `0.6b-4b-cs16-mean-w1024-bidirectional-mlp-O0.yaml`. |
 | `scripts/pretrain_config/` | Pretrain-only sweeps over adapter / encoder layouts. Naming: `{pooling}-w{W}-{mask}-{adapter}-O{O}.yaml`. |
-| `scripts/distributed_configs/` | Accelerate launcher configs: `deepspeed_zero{1,2,3}*.yaml`, `fsdp_*.yaml`, `ddp_multi_node.yaml`. |
+| `scripts/distributed_configs/` | Accelerate launcher configs: `deepspeed_zero{1,2}*.yaml`, `fsdp_*.yaml`, `ddp_multi_node.yaml`. |
 
 To match the released checkpoints, the relevant axes are
 `pooling=mean`, `mask=causal`, `adapter=mlp`, `boundary_overlap=0`,
@@ -126,69 +127,13 @@ accelerate launch \
     --output_dir ./checkpoints
 ```
 
-### Stage-3 + agent data
+### Stage-3 data
 
-The mixture builder keeps ordinary stage-3 rows unchanged, but for the
-reasoning-heavy `reasoning_data` and `dolci_think` subsets it restores the
-original (uncompressed) prompt and compresses only a safely identified target
-analysis span. The final answer/code suffix remains supervised. Ambiguous CoT
-splits fail closed and stay uncompressed.
-
-OpenThoughts trajectories remain full multi-turn conversations with
-`compression_scope=none`; every assistant turn is supervised through the
-Qwen3-4B-Instruct-2507 chat template. Rows whose `result` records an agent error
-are excluded by default.
-
-```bash
-python data/build_stage3_agent_mixture.py \
-    --agent-repeat 10 \
-    --output ./data/stage3-agent.jsonl.gz
-
-python data/preprocess_for_dynamic_packing.py \
-    --input_path ./data/stage3-agent.jsonl.gz \
-    --output_dir ./data/stage3-agent-packed \
-    --llm_tokenizer Qwen/Qwen3-4B-Instruct-2507 \
-    --embed_tokenizer Qwen/Qwen3-Embedding-0.6B \
-    --reference_chunk_size 16 \
-    --max_packed_length 32768
-```
-
-The default agent source is
-`open-thoughts/OpenThoughts-Agent-SFT-100K`. Add the distinct pre-RL cold-start
-set with `--include-coldstart`; failed traces require the explicit
-`--include-failed-agent-traces` override, and derived summary/answer variants
-require `--include-derived-agent-traces`. Source weights control streaming
-interleave order, row caps control how many examples each source pass
-contributes, and `--agent-repeat` is explicit trajectory upsampling (10 passes
-is roughly a low-single-digit agent share against the full 20.3M-row stage-3
-set).
-
-Packed batches may freely mix compressed and uncompressed sequences. During
-distributed training all ranks still enter encoder/adapter collectives; a
-globally all-uncompressed optimizer step is a true no-op for those parameter
-groups (including AdamW state and weight decay).
-
-Synthetic selective-expansion traces use the same native agent path. Their
-initial user context contains positional `seg_i` blocks whose bodies are wrapped
-in `<|memory_start|>...<|memory_end|>`. Each memory body is the full source
-document (at least 512 words), not a prewritten summary. During synthetic trace
-generation only, the teacher sees short routing descriptions so it cannot answer
-from the raw documents without calling `expand`; harvested training messages
-contain the full source documents. The assistant calls the Qwen-native
-`expand` tool with `{"segment_id": "seg_i"}`, receives that segment's original
-text as a tool result, and may continue expanding before answering. Dynamic
-preprocessing extracts memory bodies from agent message content, retains the
-native tool schema and all tool calls, supervises every assistant turn, and
-keeps system/user/tool-result tokens loss-masked.
-
-Generate a five-family Qwen-235B pilot on Modal with:
-
-```bash
-modal run --detach data/generate_synthetic_expansion_modal.py \
-    --count 5 \
-    --distractors 24 \
-    --run-name pilot-long-seg-v2
-```
+Use the public 16k or 32k packed dataset in [docs/data.md](docs/data.md).
+It includes native agents, expanded agents, reasoning and other data, with
+category-specific packing followed by global sequence shuffling. The
+[training guide](docs/training.md) covers configuration, launch commands,
+DeepSpeed ZeRO-2 and the limits of the completed validation.
 
 ### FSDP
 
