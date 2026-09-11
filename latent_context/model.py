@@ -1,5 +1,5 @@
 """
-Clean Code LLaVA implementation with simplified single forward method.
+LCLM: encode memory spans and inject their latents into the decoder.
 """
 import torch
 import torch.nn as nn
@@ -22,7 +22,7 @@ except ImportError:
 
 class LCLM(nn.Module):
     """
-    Clean Code LLaVA model that uses the processor for all code handling.
+    LCLM model using a processor to place encoded memory spans.
 
     This model:
     1. Uses processor to expand code placeholders

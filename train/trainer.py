@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Code LLaVA Trainer with Accelerate support
+LCLM trainer with Accelerate support
 """
 
 import math
@@ -58,7 +58,7 @@ torch.backends.cuda.enable_cudnn_sdp(True)
 
 class LCLMTrainer:
     """
-    Trainer class for Code LLaVA model using Accelerate
+    Trainer for LCLM using Accelerate
     """
     
     def __init__(
@@ -498,7 +498,7 @@ class LCLMTrainer:
             use_memory_wrapping=self.training_args.use_memory_wrapping,
         )
 
-        ### Code LLaVA Model ###
+        ### LCLM Model ###
         self.model = LCLM(
             decoder=self.decoder,
             decoder_tokenizer=self.decoder_tokenizer,
@@ -554,20 +554,20 @@ class LCLMTrainer:
 
         # Load tokenizer from checkpoint LLM dir
         decoder_dir = os.path.join(checkpoint_path, "decoder")
-        embed_dir = os.path.join(checkpoint_path, "encoder")
-        projectors_dir = os.path.join(checkpoint_path, "adapter")
+        encoder_dir = os.path.join(checkpoint_path, "encoder")
+        adapter_dir = os.path.join(checkpoint_path, "adapter")
         adapter_filename = "adapter.safetensors"
         if not os.path.isdir(decoder_dir):
             decoder_dir = os.path.join(checkpoint_path, "llm")
-            embed_dir = os.path.join(checkpoint_path, "embedder")
-            projectors_dir = os.path.join(checkpoint_path, "projectors")
+            encoder_dir = os.path.join(checkpoint_path, "embedder")
+            adapter_dir = os.path.join(checkpoint_path, "projectors")
             adapter_filename = "code_adapter.safetensors"
-        adapter_path = os.path.join(projectors_dir, adapter_filename)
+        adapter_path = os.path.join(adapter_dir, adapter_filename)
         if not os.path.isfile(adapter_path):
             raise FileNotFoundError(f"Checkpoint adapter weights not found: {adapter_path}")
-        print(f"LLM dir: {decoder_dir}")
-        print(f"Embedder dir: {embed_dir}")
-        print(f"Projectors dir: {projectors_dir}")
+        print(f"Decoder dir: {decoder_dir}")
+        print(f"Encoder dir: {encoder_dir}")
+        print(f"Adapter dir: {adapter_dir}")
 
         # Load tokenizer from checkpoint (contains special tokens)
         self.decoder_tokenizer = AutoTokenizer.from_pretrained(decoder_dir)
@@ -607,12 +607,12 @@ class LCLMTrainer:
             if self.model_args.train_decoder_num_layers > 0:
                 self._unfreeze_llm_layers(self.decoder, self.model_args.train_decoder_num_layers)
 
-        self.embed_tokenizer = AutoTokenizer.from_pretrained(embed_dir)
+        self.embed_tokenizer = AutoTokenizer.from_pretrained(encoder_dir)
 
         embed_attn = self.model_args.embed_attn_implementation
         print(f"Loading embedder model from checkpoint, attn={embed_attn}")
         resumed_embed_model = AutoModel.from_pretrained(
-            embed_dir,
+            encoder_dir,
             attn_implementation=embed_attn,
         )
 
@@ -703,7 +703,7 @@ class LCLMTrainer:
         # Load adapter weights
         adapter_state = load_safetensors(adapter_path)
         self.model.adapter.load_state_dict(adapter_state, strict=True)
-        print("Loaded code adapter weights")
+        print("Loaded adapter weights")
 
         # Apply gradient checkpointing settings
         if self.training_args.decoder_gradient_checkpointing:

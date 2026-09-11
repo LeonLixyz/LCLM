@@ -379,7 +379,7 @@ def rename_parquet_files(
 
 # ==================== Dynamic Packing Specific ====================
 
-# Regex pattern for memory regions (same as CodeLLaVAProcessor)
+# Regex pattern for memory regions (same as LCLMProcessor)
 MEMORY_PATTERN = re.compile(
     r'<\|memory_start\|>(.*?)<\|memory_end\|>',
     re.DOTALL

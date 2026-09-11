@@ -47,9 +47,9 @@ def load_model(
     # Local directory with decoder/, encoder/, adapter/ subdirs.
     decoder_dir = os.path.join(checkpoint_path, "decoder")
     embed_dir = os.path.join(checkpoint_path, "encoder")
-    projectors_dir = os.path.join(checkpoint_path, "adapter")
+    adapter_dir = os.path.join(checkpoint_path, "adapter")
 
-    if not all(os.path.exists(d) for d in [decoder_dir, embed_dir, projectors_dir]):
+    if not all(os.path.exists(d) for d in [decoder_dir, embed_dir, adapter_dir]):
         candidates = [
             os.path.join(checkpoint_path, d) for d in os.listdir(checkpoint_path)
             if d.startswith("checkpoint_") and os.path.isdir(os.path.join(checkpoint_path, d))
@@ -58,7 +58,7 @@ def load_model(
             latest_checkpoint = sorted(candidates, key=lambda p: int(os.path.basename(p).split('_')[1]))[-1]
             decoder_dir = os.path.join(latest_checkpoint, "decoder")
             embed_dir = os.path.join(latest_checkpoint, "encoder")
-            projectors_dir = os.path.join(latest_checkpoint, "adapter")
+            adapter_dir = os.path.join(latest_checkpoint, "adapter")
         else:
             raise FileNotFoundError(f"No valid checkpoint structure found in {checkpoint_path}")
 
@@ -85,7 +85,7 @@ def load_model(
 
     print(f"Loading LLM from: {decoder_dir}")
     print(f"Loading embedder from: {embed_dir}")
-    print(f"Loading projectors from: {projectors_dir}")
+    print(f"Loading adapter from: {adapter_dir}")
 
     # Set dtype and attention implementation. Flash attention is preferred
     # for bf16/fp16 but falls back to sdpa when the package isn't installed
@@ -196,7 +196,7 @@ def load_model(
     )
 
     # Load adapter weights
-    adapter_path = os.path.join(projectors_dir, "adapter.safetensors")
+    adapter_path = os.path.join(adapter_dir, "adapter.safetensors")
     if os.path.isfile(adapter_path):
         adapter_state = load_safetensors(adapter_path)
         model.adapter.load_state_dict(adapter_state, strict=True)

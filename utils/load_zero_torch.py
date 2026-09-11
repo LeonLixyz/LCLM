@@ -131,7 +131,8 @@ def load_and_map_checkpoint(
     embed_lora_dropout=None,
     embed_lora_target_modules=None,
     adapter_type="mlp",
-    num_adapter_layers=1,    pooling="summary_mean",
+    num_adapter_layers=1,
+    pooling="mean",
     encoder_mask_type="bidirectional",
     encoder_window_size=1024,
     boundary_overlap=0,
@@ -224,7 +225,7 @@ def load_and_map_checkpoint(
         max_memory_length=max_memory_length,
     )
     
-    ### CREATE CODELLAVA MODEL ###
+    ### CREATE LCLM MODEL ###
     model = LCLM(
         decoder=decoder,
         decoder_tokenizer=decoder_tokenizer,
@@ -345,11 +346,11 @@ def load_and_map_checkpoint(
         # Create structured output directories
         decoder_dir = os.path.join(output_dir, "decoder")
         encoder_dir = os.path.join(output_dir, "encoder")
-        projectors_dir = os.path.join(output_dir, "adapter")
+        adapter_dir = os.path.join(output_dir, "adapter")
         
         os.makedirs(decoder_dir, exist_ok=True)
         os.makedirs(encoder_dir, exist_ok=True)
-        os.makedirs(projectors_dir, exist_ok=True)
+        os.makedirs(adapter_dir, exist_ok=True)
         
         # Save LLM model and tokenizer
         print("Saving LLM model and tokenizer...")
@@ -370,7 +371,7 @@ def load_and_map_checkpoint(
         # Save code adapter
         print("Saving code adapter...")
         adapter_state = {k: v.detach().cpu() for k, v in model.adapter.state_dict().items()}
-        save_safetensors(adapter_state, os.path.join(projectors_dir, "adapter.safetensors"))
+        save_safetensors(adapter_state, os.path.join(adapter_dir, "adapter.safetensors"))
         
         # Save model configuration
         print("Saving model configuration...")
