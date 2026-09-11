@@ -77,6 +77,18 @@ Transformers 4.57.1, FlashAttention 2.8.3, TorchData 0.11.0, datasets 3.6.0,
 PyArrow 21.0.0 and Liger 0.6.2. The Modal image is defined in
 `scripts/stage3_deepspeed_modal.py`.
 
+The focused regression in `tests/test_cot_compression.py` places memory inside
+an assistant continuation. With packed FlashAttention, a real tiny Qwen3
+encoder/decoder and an MLP adapter, it checks that changed CoT cannot affect
+preceding predictions or another packed document, while subsequent loss reaches
+both encoder and adapter. It also checks fused-CE parity and gradient checkpointing.
+Run this GPU test on Modal alongside `tests/test_packed_flash_parity.py`. Both passed.
+The source-to-packed audit made 120 comparisons across both lengths and checked
+1,252 runtime example expansions, with no ID, label, memory-placement or length
+mismatches. These are sample checks, separate from the full-file content-hash
+verification. Details and the CoT boundary limitation are in
+[data-verification.json](data-verification.json) and [data.md](data.md).
+
 ## Repeat bounded checks
 
 These harnesses use the saved build and regression fixtures on Modal volume

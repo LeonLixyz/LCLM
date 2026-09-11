@@ -30,5 +30,149 @@
     "state_json_present": false,
     "status": "complete",
     "verified_payload_revision": "dec5d3ce9b87c7dfb0d521df07d29fd45765d739"
+  },
+  "training_semantics": {
+    "checked_code_revision": "7e360e96263ae584e0c72b58fba0a129fca082d8",
+    "comparison_scope": "Stratified samples at both lengths; this is not an exhaustive semantic annotation audit.",
+    "compressed_reasoning_sample": {
+      "assistant_counts": {
+        "dolci_think_assistant_think_tags": 0,
+        "dolci_think_assistant_turns": 24,
+        "dolci_think_tool_calls": 0,
+        "dolci_think_tool_observations": 0,
+        "reasoning_data_assistant_think_tags": 0,
+        "reasoning_data_assistant_turns": 24,
+        "reasoning_data_tool_calls": 0,
+        "reasoning_data_tool_observations": 0
+      },
+      "packed_files_hash_verified": 2,
+      "packed_sequences_checked": 48,
+      "raw_files_hash_verified": 47,
+      "raw_samples": 48,
+      "reasoning_compressed_samples": {
+        "dolci_think": 24,
+        "reasoning_data": 24
+      },
+      "reasoning_uncompressed_samples": {},
+      "runtime_examples_checked": 563,
+      "runtime_memory_regions_checked": 327,
+      "sample_counts": {
+        "16384": {
+          "dolci_think": 12,
+          "reasoning_data": 12
+        },
+        "32768": {
+          "dolci_think": 12,
+          "reasoning_data": 12
+        }
+      },
+      "status": "passed",
+      "unmasked_first_example_labels": {}
+    },
+    "decoder_revision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+    "detailed_sample_reports_sha256": {
+      "semantic-cot-result.json": "6397ed4a9093322c484fa747eade37894ae145f0c9b442d3f580f51ead846df0",
+      "semantic-data-result.json": "9efa2ce2641c1ef6ad0a901b4dec8b495486bb24cb58eff0665290f6801ea83d"
+    },
+    "distinct_raw_rows": 116,
+    "encoder_revision": "97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3",
+    "general_sample": {
+      "assistant_counts": {
+        "dolci_think_assistant_think_tags": 0,
+        "dolci_think_assistant_turns": 16,
+        "dolci_think_tool_calls": 0,
+        "dolci_think_tool_observations": 0,
+        "expanded_assistant_think_tags": 0,
+        "expanded_assistant_turns": 41,
+        "expanded_tool_calls": 34,
+        "expanded_tool_observations": 34,
+        "native_assistant_think_tags": 0,
+        "native_assistant_turns": 109,
+        "native_tool_calls": 63,
+        "native_tool_observations": 62,
+        "other_assistant_think_tags": 0,
+        "other_assistant_turns": 8,
+        "other_tool_calls": 0,
+        "other_tool_observations": 0,
+        "reasoning_data_assistant_think_tags": 0,
+        "reasoning_data_assistant_turns": 16,
+        "reasoning_data_tool_calls": 0,
+        "reasoning_data_tool_observations": 0
+      },
+      "packed_files_hash_verified": 3,
+      "packed_sequences_checked": 72,
+      "raw_files_hash_verified": 72,
+      "raw_samples": 72,
+      "reasoning_compressed_samples": {
+        "dolci_think": 3,
+        "reasoning_data": 2
+      },
+      "reasoning_uncompressed_samples": {
+        "dolci_think": 13,
+        "reasoning_data": 14
+      },
+      "runtime_examples_checked": 689,
+      "runtime_memory_regions_checked": 1640,
+      "sample_counts": {
+        "16384": {
+          "dolci_think": 8,
+          "expanded": 8,
+          "native": 8,
+          "other": 4,
+          "reasoning_data": 8
+        },
+        "32768": {
+          "dolci_think": 8,
+          "expanded": 8,
+          "native": 8,
+          "other": 4,
+          "reasoning_data": 8
+        }
+      },
+      "status": "passed",
+      "unmasked_first_example_labels": {}
+    },
+    "gpu_checks": {
+      "covers": [
+        "target-side memory causality",
+        "cross-document isolation",
+        "online re-encoding",
+        "encoder/adapter continuation gradients",
+        "fused CE parity",
+        "gradient checkpointing"
+      ],
+      "platform": "Modal H200:8 container, single-process small Qwen3 models",
+      "production_code_modified": false,
+      "result": "...                                                                      [100%]\n3 passed in 21.04s"
+    },
+    "limitations": [
+      "CoT50 selects about half of reasoning rows; not every row is compressed.",
+      "Training uses stored reference CoT; it does not generate on-policy reasoning rollouts.",
+      "611131 raw rows use a last-128-decoder-token fallback rather than an explicit CoT/answer boundary."
+    ],
+    "packed_revision": "f46f4124d6c602ec74d931d6999def02b6d9e7bb",
+    "raw_revision": "f72b2fafa7dec00c03b272b24bc83c4c27db6bc3",
+    "raw_rewrite_accounting": {
+      "assigned_compressed_rows": 2702448,
+      "assigned_uncompressed_rows": 2704973,
+      "changed_rows": 2698545,
+      "fallback_answer_tokens": 128,
+      "methods": {
+        "fallback:last-128-tokens": 611131,
+        "marker:ANSWER:": 170,
+        "marker:Answer:": 9224,
+        "marker:FINAL ANSWER:": 18,
+        "marker:Final Answer:": 6013,
+        "marker:Final answer:": 7602,
+        "pattern:answer-line": 129806,
+        "pattern:boxed": 1666252,
+        "pattern:gsm8k-final-line": 4,
+        "pattern:last-code-fence": 268325
+      },
+      "reasoning_compression_fraction": 0.5,
+      "selected_rows": 5407421,
+      "short_uncompressed_rows": 3903
+    },
+    "raw_to_packed_comparisons": 120
   }
 }

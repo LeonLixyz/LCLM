@@ -61,6 +61,34 @@ Whole examples exceeding a version's compressed length limit were excluded, not
 truncated. Of the 152,503 expanded examples, 16k retains 152,498 and 32k retains
 all 152,503. The raw dataset preserves examples excluded from either packed version.
 
+## What the training objective sees
+
+| Data kind | Encoder input | Decoder supervision |
+|---|---|---|
+| Reasoning | Selected target spans under the CoT boundary rules below; prompts stay intact | Uncompressed target tokens, including the preserved answer suffix |
+| Native agents | None; the trajectory stays uncompressed | Every assistant payload, including native tool calls and turn endings |
+| Expanded agents | Marked input segments containing full source observations | Assistant tool calls and responses; user/system/tool messages are masked |
+| Other data | The source's existing marked regions, including prompt context | The source's existing unmasked target tokens |
+
+The packed files store reference CoT as text, not frozen latent vectors. During
+training the loader tokenizes each memory body with the encoder tokenizer, and
+the model runs its encoder and adapter on every forward pass. Those vectors
+replace the corresponding decoder memory positions. Continuation loss therefore
+trains the encoder/adapter through the compressed CoT, while the compressed text
+and memory boundary tags have no direct token-prediction loss.
+
+This is teacher-forced training using **stored reference CoT**. The training loop
+does not generate a fresh reasoning rollout and then compress its own output.
+Inference-time compression of generated reasoning requires a separate controller.
+CoT50 assigns roughly half of reasoning rows to compression, leaving the other
+half fully uncompressed. Selected rows use explicit analysis/final-answer
+boundaries where available; the fallback compresses the prefix and retains the
+last 128 decoder tokens. Short targets without a compressible prefix remain
+uncompressed. This fallback is a heuristic boundary, not an annotated CoT label. Of the
+2,698,545 compressed raw reasoning rows, 611,131 use this fallback; it cannot
+guarantee that a long final answer remains entirely outside memory. Non-thinking generation of the expanded agent data is separate from
+CoT compression in the reasoning datasets.
+
 ## Raw examples
 
 Raw means processed training examples before tokenization/packing, rather than
