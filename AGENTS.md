@@ -24,6 +24,9 @@ not cover the separate Code-LLaVA implementation.
 - Keep dummy encoder/adapter participation on ranks without memory, equal
   loader lengths across ranks, packed-document attention isolation and memory
   label masks.
+- Set DeepSpeed's microbatch size from the actual loader. Validate checkpoint
+  compression/adapter metadata on resume; legacy `summary_mean` maps to windowed
+  `mean`, with the saved window, ratio, mask and overlap preserved.
 - Use one packed length per run. Preserve the pinned tokenizers, 16:1 compression,
   assistant-only supervision, category-specific packing and sequence shuffling.
 - ZeRO-2 normally shards across the full data-parallel group, including multiple

@@ -536,9 +536,9 @@ class LCLMTrainer:
         """Resume training from a HuggingFace-format checkpoint directory.
         
         This loads model weights from a previously trained checkpoint in HF format:
-        - decoder/ directory containing decoder model and tokenizer
-        - embedder/ directory containing embedder model and tokenizer  
-        - projectors/ directory containing projection layer weights
+        - decoder/, encoder/, adapter/ (current layout), or
+        - llm/, embedder/, projectors/ (legacy layout)
+        - model_config.json describing matching compression/adapter settings
         
         Note: This does NOT load optimizer/scheduler state. Use auto_resume for that.
         This is typically used to start training from a pre-trained model checkpoint.
@@ -547,6 +547,10 @@ class LCLMTrainer:
             checkpoint_path: Path to checkpoint directory with decoder/, encoder/, adapter/ subdirs
         """
         print(f"Resuming training from HF-format checkpoint: {checkpoint_path}")
+        from utils.checkpointing import validate_resume_model_config
+        checkpoint_config = validate_resume_model_config(
+            checkpoint_path, self.model_args, self.training_args.compression_ratio)
+        print(f"Validated checkpoint compression config: {checkpoint_config}")
 
         # Load tokenizer from checkpoint LLM dir
         decoder_dir = os.path.join(checkpoint_path, "decoder")
@@ -558,6 +562,9 @@ class LCLMTrainer:
             embed_dir = os.path.join(checkpoint_path, "embedder")
             projectors_dir = os.path.join(checkpoint_path, "projectors")
             adapter_filename = "code_adapter.safetensors"
+        adapter_path = os.path.join(projectors_dir, adapter_filename)
+        if not os.path.isfile(adapter_path):
+            raise FileNotFoundError(f"Checkpoint adapter weights not found: {adapter_path}")
         print(f"LLM dir: {decoder_dir}")
         print(f"Embedder dir: {embed_dir}")
         print(f"Projectors dir: {projectors_dir}")
@@ -694,13 +701,9 @@ class LCLMTrainer:
         )
 
         # Load adapter weights
-        adapter_path = os.path.join(projectors_dir, adapter_filename)
-        if os.path.isfile(adapter_path):
-            adapter_state = load_safetensors(adapter_path)
-            self.model.adapter.load_state_dict(adapter_state, strict=True)
-            print("Loaded code adapter weights")
-        else:
-            print(f"Warning: adapter weights not found at {adapter_path}")
+        adapter_state = load_safetensors(adapter_path)
+        self.model.adapter.load_state_dict(adapter_state, strict=True)
+        print("Loaded code adapter weights")
 
         # Apply gradient checkpointing settings
         if self.training_args.decoder_gradient_checkpointing:
@@ -822,8 +825,11 @@ class LCLMTrainer:
             # For IterableDataset (dynamic packing with StatefulDataLoader):
             # - Don't wrap dataloader with accelerate (causes prefetch state mismatch)
             # - Move batches to device manually in training loop
-            if self.accelerator.state.deepspeed_plugin is not None:
-                self.accelerator.state.deepspeed_plugin.deepspeed_config['train_micro_batch_size_per_gpu'] = 1
+            if plugin is not None:
+                batch_size = self.train_dataloader.batch_size
+                if not isinstance(batch_size, int) or isinstance(batch_size, bool) or batch_size <= 0:
+                    raise ValueError("DeepSpeed requires a positive integer loader batch_size")
+                plugin.deepspeed_config['train_micro_batch_size_per_gpu'] = batch_size
 
             self.model, self.optimizer, self.scheduler = self.accelerator.prepare(
                 self.model, self.optimizer, self.scheduler)

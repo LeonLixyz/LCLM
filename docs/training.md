@@ -22,6 +22,18 @@ The parser otherwise infers stage 3's starting checkpoint as
 configured base models is intended. Check `training.auto_resume` to avoid picking
 up an unrelated output run.
 
+HF checkpoint resume validates `model_config.json` before loading weights and
+requires the saved adapter. For legacy Code-LLaVA checkpoints, `summary_mean`
+maps to LCLM `mean`, `chunk_size` to `compression_ratio`, and
+`batch_summary_tokens` to `encoder_window_size`. The mask, overlap and adapter
+must also match. Sean's stage-3 configs require `mean`, ratio 16,
+window 1024, causal masking, overlap 0 and an MLP. Legacy `mean` instead encoded
+each compression group independently; it is not equivalent to window 1024.
+
+For packed training, DeepSpeed takes its microbatch size from the actual loader.
+Sean's configs keep `max_encode_batch_size: 1024` and use two packed sequences
+per GPU with accumulation 1: 128 GPUs give 256 sequences per optimizer update.
+
 The tested baseline uses BF16, mean pooling, a bidirectional 1024-token encoder
 window, an MLP adapter, encoder batch cap 32, gradient accumulation 2 and gradient
 checkpointing for both models. It sets `training.use_liger_kernel: false` and
@@ -66,6 +78,18 @@ The September 10, 2026 checks passed on a **single Modal H200:8 node**:
 
 Multi-node/RDMA and full model/optimizer checkpoint restore remain unverified.
 The passing loader-resume check does not cover those checkpoint states.
+
+The September 11 follow-up passed 16 CPU configuration/optimizer regressions,
+including exact weight loading from both HF checkpoint layouts. With
+deterministic FlashAttention, the legacy `summary_mean` and current `mean`
+encoders matched outputs and gradients exactly for nine segment lengths across
+1024-token window boundaries, with gradient checkpointing enabled and disabled.
+This comparison used ratio 16, causal masking, zero overlap and encoder batch
+cap 1024 on Modal H200:8.
+Four eight-rank runs also passed through the production trainer's preparation
+and update methods: ZeRO-1/2, each with microbatch 2 and accumulation 1/2.
+The engine's batch/sample counts and analytic SGD updates matched exactly.
+These small-model checks do not validate Sean's remote checkpoint or ROCm cluster.
 
 The optimizer fix lives in `train/deepspeed_step.py`: backward and update are
 separate, synchronized finite checks inspect ZeRO gradient buffers before any

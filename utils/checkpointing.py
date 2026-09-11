@@ -74,6 +74,60 @@ def load_model_config(checkpoint_path: str) -> Dict[str, Any]:
     with open(p) as f:
         return json.load(f)
 
+
+def validate_resume_model_config(checkpoint_path, model_args, compression_ratio):
+    """Check encoder/adapter semantics before loading an HF checkpoint.
+
+    Legacy summary_mean is windowed mean pooling, not the legacy mean mode
+    that encoded each compression group independently. Do not infer this from
+    a checkpoint directory's name.
+    """
+    saved = load_model_config(checkpoint_path)
+    if "pooling_token" in saved:
+        legacy_pooling = saved["pooling_token"]
+        if legacy_pooling not in ("summary_mean", "summary_concat", "mean"):
+            raise ValueError(f"Unsupported legacy checkpoint pooling: {legacy_pooling!r}")
+        ratio = saved["chunk_size"]
+        window = saved["batch_summary_tokens"]
+        overlap = saved.get("overlap_tokens")
+        if overlap is None:
+            overlap = window // 4  # CodeChunker's historical default.
+        if legacy_pooling == "mean":
+            window, overlap = ratio, 0
+        adapter = "mlp"
+        if saved.get("use_adapter_attention", False):
+            adapter = {"attention_mlp": "attn_mlp", "mlp_attention": "mlp_attn"}[
+                saved["adapter_order"]
+            ]
+        saved = {
+            "pooling": "concat" if legacy_pooling == "summary_concat" else "mean",
+            "compression_ratio": ratio,
+            "encoder_window_size": window,
+            "encoder_mask_type": saved["embed_mask_type"],
+            "boundary_overlap": overlap,
+            "adapter_type": adapter,
+            "num_adapter_layers": saved.get("num_adapter_layers", 1),
+        }
+
+    expected = {name: getattr(model_args, name) for name in (
+        "pooling", "encoder_window_size", "encoder_mask_type",
+        "boundary_overlap", "adapter_type",
+    )}
+    expected["compression_ratio"] = compression_ratio
+    if model_args.adapter_type != "mlp":
+        expected["num_adapter_layers"] = model_args.num_adapter_layers
+    mismatches = [
+        f"{name}: checkpoint={saved.get(name)!r}, requested={value!r}"
+        for name, value in expected.items() if saved.get(name) != value
+    ]
+    if mismatches:
+        raise ValueError(
+            f"Checkpoint configuration mismatch at {checkpoint_path}: "
+            + "; ".join(mismatches)
+        )
+    return {name: saved[name] for name in expected}
+
+
 def save_checkpoint(
     *,
     accelerator,
