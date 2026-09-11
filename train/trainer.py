@@ -552,6 +552,12 @@ class LCLMTrainer:
         decoder_dir = os.path.join(checkpoint_path, "decoder")
         embed_dir = os.path.join(checkpoint_path, "encoder")
         projectors_dir = os.path.join(checkpoint_path, "adapter")
+        adapter_filename = "adapter.safetensors"
+        if not os.path.isdir(decoder_dir):
+            decoder_dir = os.path.join(checkpoint_path, "llm")
+            embed_dir = os.path.join(checkpoint_path, "embedder")
+            projectors_dir = os.path.join(checkpoint_path, "projectors")
+            adapter_filename = "code_adapter.safetensors"
         print(f"LLM dir: {decoder_dir}")
         print(f"Embedder dir: {embed_dir}")
         print(f"Projectors dir: {projectors_dir}")
@@ -688,7 +694,7 @@ class LCLMTrainer:
         )
 
         # Load adapter weights
-        adapter_path = os.path.join(projectors_dir, "adapter.safetensors")
+        adapter_path = os.path.join(projectors_dir, adapter_filename)
         if os.path.isfile(adapter_path):
             adapter_state = load_safetensors(adapter_path)
             self.model.adapter.load_state_dict(adapter_state, strict=True)

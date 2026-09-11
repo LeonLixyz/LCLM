@@ -1,0 +1,68 @@
+experiment: 0.6b-4b-cs16-mean-w1024-mlp-ov0-causal-stage3-final-mixture-20260910-32k-from-stage2-lr3e-5
+
+models:
+  encoder: Qwen/Qwen3-Embedding-0.6B
+  decoder: Qwen/Qwen3-4B-Instruct-2507
+  pooling: mean
+  adapter_type: mlp
+  encoder_window_size: 1024
+  mask: causal
+  decoder_attn_implementation: flash_attention_2
+  embed_attn_implementation: flash_attention_2
+  boundary_overlap: 0
+  use_fused_ce: false
+
+training:
+  compression_ratio: 16
+  max_encode_batch_size: 1024
+  gradient_accumulation_steps: 1
+  num_epochs: 1
+  warmup_steps: 500
+  max_grad_norm: 1.0
+  save_steps: 1000
+  delete_old_checkpoints: true
+  seed: 4231
+  auto_resume: true
+  preempt_save_minutes: 10
+  optimizer: adamw
+  scheduler: cosine
+  adam_epsilon: 1.0e-8
+  decoder_betas: "0.9,0.95"
+  encoder_betas: "0.9,0.95"
+  adapter_betas: "0.9,0.95"
+  decoder_gradient_checkpointing: true
+  use_liger_kernel: true
+
+data:
+  num_workers: 0
+  use_packing: true
+  use_memory_wrapping: true
+  packed_attention_backend: flash
+  train_wrap_tokens: true
+
+logging:
+  wandb_project: compression-training-prod
+  wandb_name: tuo-prod-0.6b-4b-cs16-mean-w1024-mlp-ov0-causal-stage3-final-mixture-20260910-32k-from-stage2-lr3e-5
+  log_interval: 10
+  log_token_counts: true
+
+stages:
+  3:
+    train_batch_size: 2
+    warmup_steps: 500
+    train_decoder: true
+    train_encoder: true
+    adapter_lr: 3.0e-5
+    encoder_lr: 3.0e-5
+    decoder_lr: 3.0e-5
+    min_lr: 1.0e-6
+    decoder_weight_decay: 0.0
+    encoder_weight_decay: 0.01
+    adapter_weight_decay: 0.01
+    encoder_gradient_checkpointing: true
+    dataset: /p/vast1/rl/compression_data/packed_batches/stage3-final-mixture-20260910-packed/packed-cs16-32768
+    max_packed_length: 32768
+    resume_from_checkpoint: /usr/workspace/mcleish1/LCLM/tuo_outputs_prod/tuo-prod-0.6b-embed-4b-instruct-cs-16-summary-mean-1024-mlp-ov0-causal-1e-5/checkpoints/Qwen3-Embedding-0.6B-Qwen3-4B-Instruct-2507-cs16-summary_mean-bst1024-mlp-ov0/stage2-hf
+    distributed:
+      type: deepspeed
+      config: /usr/workspace/mcleish1/LCLM/sean_shells/tuo_deepspeed_zero1_multi_node.yaml
