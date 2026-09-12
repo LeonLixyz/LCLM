@@ -62,7 +62,7 @@ stages:
     encoder_gradient_checkpointing: true
     dataset: /p/vast1/rl/compression_data/packed_batches/stage3-final-mixture-20260910-packed/packed-cs16-16384
     max_packed_length: 16384
-    resume_from_checkpoint: /usr/workspace/mcleish1/LCLM/tuo_outputs_prod/tuo-prod-0.6b-embed-4b-instruct-cs-16-summary-mean-1024-mlp-ov0-causal-1e-5/checkpoints/Qwen3-Embedding-0.6B-Qwen3-4B-Instruct-2507-cs16-summary_mean-bst1024-mlp-ov0/stage2-hf
+    resume_from_checkpoint: /usr/workspace/mcleish1/LCLM/checkpoints/Qwen3-Embedding-0.6B-Qwen3-4B-Instruct-2507-cs16-mean-w1024-mlp-ov0-causal/stage2-hf
     distributed:
       type: deepspeed
       config: /usr/workspace/mcleish1/LCLM/sean_shells/tuo_deepspeed_zero1_multi_node.yaml
