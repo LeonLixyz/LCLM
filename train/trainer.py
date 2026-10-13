@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Code LLaVA Trainer with Accelerate support
+LCLM trainer with Accelerate support
 """
 
 import math
@@ -49,6 +49,7 @@ from torch.distributed.fsdp.fully_sharded_data_parallel import ShardedStateDictC
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.distributed.fsdp import BackwardPrefetch                                                                                                   
 from utils.env import load_env
+from train.optimizer_utils import clear_optimizer_group_grads, global_has_memory
 
 torch.backends.cuda.enable_flash_sdp(True)
 torch.backends.cuda.enable_math_sdp(False)
@@ -57,7 +58,7 @@ torch.backends.cuda.enable_cudnn_sdp(True)
 
 class LCLMTrainer:
     """
-    Trainer class for Code LLaVA model using Accelerate
+    Trainer for LCLM using Accelerate
     """
     
     def __init__(
@@ -158,6 +159,8 @@ class LCLMTrainer:
         # Set accelerator on the model components separately
         self.model.setup_accelerator(self.accelerator)
         self.model.encoder.setup_accelerator(self.accelerator)
+        self.model.accelerator = self.accelerator
+        self.model.encoder.accelerator = self.accelerator
 
         self.load_datasets()
         self.setup_optimizer_and_scheduler()
@@ -495,7 +498,7 @@ class LCLMTrainer:
             use_memory_wrapping=self.training_args.use_memory_wrapping,
         )
 
-        ### Code LLaVA Model ###
+        ### LCLM Model ###
         self.model = LCLM(
             decoder=self.decoder,
             decoder_tokenizer=self.decoder_tokenizer,
@@ -533,9 +536,9 @@ class LCLMTrainer:
         """Resume training from a HuggingFace-format checkpoint directory.
         
         This loads model weights from a previously trained checkpoint in HF format:
-        - decoder/ directory containing decoder model and tokenizer
-        - embedder/ directory containing embedder model and tokenizer  
-        - projectors/ directory containing projection layer weights
+        - decoder/, encoder/, adapter/ (current layout), or
+        - llm/, embedder/, projectors/ (legacy layout)
+        - model_config.json describing matching compression/adapter settings
         
         Note: This does NOT load optimizer/scheduler state. Use auto_resume for that.
         This is typically used to start training from a pre-trained model checkpoint.
@@ -544,14 +547,27 @@ class LCLMTrainer:
             checkpoint_path: Path to checkpoint directory with decoder/, encoder/, adapter/ subdirs
         """
         print(f"Resuming training from HF-format checkpoint: {checkpoint_path}")
+        from utils.checkpointing import validate_resume_model_config
+        checkpoint_config = validate_resume_model_config(
+            checkpoint_path, self.model_args, self.training_args.compression_ratio)
+        print(f"Validated checkpoint compression config: {checkpoint_config}")
 
         # Load tokenizer from checkpoint LLM dir
         decoder_dir = os.path.join(checkpoint_path, "decoder")
-        embed_dir = os.path.join(checkpoint_path, "encoder")
-        projectors_dir = os.path.join(checkpoint_path, "adapter")
-        print(f"LLM dir: {decoder_dir}")
-        print(f"Embedder dir: {embed_dir}")
-        print(f"Projectors dir: {projectors_dir}")
+        encoder_dir = os.path.join(checkpoint_path, "encoder")
+        adapter_dir = os.path.join(checkpoint_path, "adapter")
+        adapter_filename = "adapter.safetensors"
+        if not os.path.isdir(decoder_dir):
+            decoder_dir = os.path.join(checkpoint_path, "llm")
+            encoder_dir = os.path.join(checkpoint_path, "embedder")
+            adapter_dir = os.path.join(checkpoint_path, "projectors")
+            adapter_filename = "code_adapter.safetensors"
+        adapter_path = os.path.join(adapter_dir, adapter_filename)
+        if not os.path.isfile(adapter_path):
+            raise FileNotFoundError(f"Checkpoint adapter weights not found: {adapter_path}")
+        print(f"Decoder dir: {decoder_dir}")
+        print(f"Encoder dir: {encoder_dir}")
+        print(f"Adapter dir: {adapter_dir}")
 
         # Load tokenizer from checkpoint (contains special tokens)
         self.decoder_tokenizer = AutoTokenizer.from_pretrained(decoder_dir)
@@ -591,12 +607,12 @@ class LCLMTrainer:
             if self.model_args.train_decoder_num_layers > 0:
                 self._unfreeze_llm_layers(self.decoder, self.model_args.train_decoder_num_layers)
 
-        self.embed_tokenizer = AutoTokenizer.from_pretrained(embed_dir)
+        self.embed_tokenizer = AutoTokenizer.from_pretrained(encoder_dir)
 
         embed_attn = self.model_args.embed_attn_implementation
         print(f"Loading embedder model from checkpoint, attn={embed_attn}")
         resumed_embed_model = AutoModel.from_pretrained(
-            embed_dir,
+            encoder_dir,
             attn_implementation=embed_attn,
         )
 
@@ -685,13 +701,9 @@ class LCLMTrainer:
         )
 
         # Load adapter weights
-        adapter_path = os.path.join(projectors_dir, "adapter.safetensors")
-        if os.path.isfile(adapter_path):
-            adapter_state = load_safetensors(adapter_path)
-            self.model.adapter.load_state_dict(adapter_state, strict=True)
-            print("Loaded code adapter weights")
-        else:
-            print(f"Warning: adapter weights not found at {adapter_path}")
+        adapter_state = load_safetensors(adapter_path)
+        self.model.adapter.load_state_dict(adapter_state, strict=True)
+        print("Loaded adapter weights")
 
         # Apply gradient checkpointing settings
         if self.training_args.decoder_gradient_checkpointing:
@@ -778,6 +790,16 @@ class LCLMTrainer:
         
         # Store parameter group names for logging
         self.param_group_names = [info[1] for info in group_info]
+        self._compression_param_group_indices = {
+            group_index
+            for group_index, group_name in group_info
+            if group_name in {"Embedder", "Adapter"}
+        }
+        # Keep the group identity through DeepSpeed's flattened/master-parameter
+        # transformations, including its temporary per-subgroup optimizer lists.
+        from train.deepspeed_step import COMPRESSION_GROUP
+        for index, group in enumerate(self.optimizer.param_groups):
+            group[COMPRESSION_GROUP] = index in self._compression_param_group_indices
         
         # Log what we're doing
         self.accelerator.print(f"Using {self.training_args.scheduler_type} scheduler for all parameter groups:")
@@ -794,12 +816,20 @@ class LCLMTrainer:
         from torch.utils.data import IterableDataset
         is_iterable = isinstance(self.train_dataloader.dataset, IterableDataset)
 
+        plugin = self.accelerator.state.deepspeed_plugin
+        if plugin is not None:
+            from train.deepspeed_step import validate_zero_stage
+            validate_zero_stage(plugin.zero_stage)
+
         if is_iterable:
             # For IterableDataset (dynamic packing with StatefulDataLoader):
             # - Don't wrap dataloader with accelerate (causes prefetch state mismatch)
             # - Move batches to device manually in training loop
-            if self.accelerator.state.deepspeed_plugin is not None:
-                self.accelerator.state.deepspeed_plugin.deepspeed_config['train_micro_batch_size_per_gpu'] = 1
+            if plugin is not None:
+                batch_size = self.train_dataloader.batch_size
+                if not isinstance(batch_size, int) or isinstance(batch_size, bool) or batch_size <= 0:
+                    raise ValueError("DeepSpeed requires a positive integer loader batch_size")
+                plugin.deepspeed_config['train_micro_batch_size_per_gpu'] = batch_size
 
             self.model, self.optimizer, self.scheduler = self.accelerator.prepare(
                 self.model, self.optimizer, self.scheduler)
@@ -811,9 +841,23 @@ class LCLMTrainer:
             self.model, self.optimizer, self.scheduler, self.train_dataloader = self.accelerator.prepare(
                 self.model, self.optimizer, self.scheduler, self.train_dataloader)
 
+        # Accelerate may replace the root model with a DDP/FSDP/DeepSpeed
+        # wrapper. Rebind the custom cross-rank helpers on the unwrapped module.
+        unwrapped_model = self.accelerator.unwrap_model(self.model)
+        unwrapped_model.setup_accelerator(self.accelerator)
+        unwrapped_model.encoder.setup_accelerator(self.accelerator)
+
         # Load checkpoint if auto-resume is enabled
         if self.auto_resume_checkpoint_path is not None:
             self._load_auto_resume_checkpoint()
+
+        self._deepspeed_step = None
+        if self.accelerator.distributed_type.name == "DEEPSPEED":
+            from train.deepspeed_step import COMPRESSION_GROUP, DeepSpeedStep
+            # Reapply metadata after restoring an older optimizer checkpoint.
+            for index, group in enumerate(self.model.basic_optimizer.param_groups):
+                group[COMPRESSION_GROUP] = index in self._compression_param_group_indices
+            self._deepspeed_step = DeepSpeedStep(self.model, self.accelerator)
 
         # Print FSDP structure for debugging
         # if self.training_args.distributed_type == "fsdp":
@@ -1198,7 +1242,7 @@ class LCLMTrainer:
                     "train/loss": loss_value,
                     "train/loss_running_avg": running_avg_loss,
                     "train/step": self.global_step,
-                    "train/compression_ratio": self.model.encoder.compression_ratio,
+                    "train/compression_ratio": self.training_args.compression_ratio,
                     "train/skipped": 0,
                 }
 
@@ -1374,14 +1418,34 @@ class LCLMTrainer:
             )
 
             self.accelerator.print(
-                f"[Step {step}] compression_ratio={self.model.encoder.compression_ratio}, "
+                f"[Step {step}] compression_ratio={self.training_args.compression_ratio}, "
                 f"batch_size={batch_size}, seq_len={seq_len}, num_regions={num_regions}, "
                 f"total_embed_tokens={total_embed_tokens}, total_memory_tokens={total_chunks}"
             )
 
         # If sample_lens is not None, we are using packed training, otherwise we are using regular training
+        deepspeed_step = getattr(self, "_deepspeed_step", None)
+        if deepspeed_step is not None:
+            deepspeed_step.begin_microbatch()
         outputs = self.model(**batch, sample_lens=sample_lens)
         loss = outputs.loss
+
+        # Track whether any microbatch contributing to this optimizer step used
+        # compression. Dummy module participation is still required for
+        # distributed collectives, but globally all-uncompressed steps should
+        # not advance AdamW momentum/weight decay for encoder/adapter groups.
+        if not hasattr(self, "_optimizer_step_has_memory"):
+            self._optimizer_step_has_memory = False
+        self._optimizer_step_has_memory = (
+            self._optimizer_step_has_memory
+            or bool(
+                getattr(
+                    self.accelerator.unwrap_model(self.model),
+                    "_last_local_has_memory",
+                    False,
+                )
+            )
+        )
 
         # DEBUG: Sync and check after forward
         # import torch
@@ -1389,6 +1453,20 @@ class LCLMTrainer:
         # print(f"[DEBUG Step {step}] Forward done, loss={loss.item():.4f}")
 
         # self.accelerator.print(f"Loss: {loss}")
+        if deepspeed_step is not None:
+            valid = deepspeed_step.backward_and_step(
+                loss, local_has_memory=self._optimizer_step_has_memory)
+            if self.accelerator.sync_gradients:
+                if deepspeed_step.last_step_applied:
+                    # DeepSpeed-owned schedulers are no-ops through this wrapper;
+                    # externally owned schedulers still need one explicit call.
+                    self.scheduler.step()
+                self._optimizer_step_has_memory = False
+            if not valid:
+                self.accelerator.print(f"[Step {self.global_step}] Non-finite DeepSpeed window rejected before update.")
+                return None
+            return loss.item()
+
         self.accelerator.backward(loss)
 
         # DEBUG: Sync and check after backward
@@ -1404,18 +1482,20 @@ class LCLMTrainer:
         # torch.cuda.synchronize()
         # print(f"[DEBUG Step {step}] Grad check done")
 
-        # Check for non-finite loss and gradients
-        # Only check gradients when loss is non-finite to avoid expensive full parameter sweep
-        if not torch.isfinite(loss).item():
-            non_finite_any = has_non_finite_loss_and_gradients(loss=loss, model=self.model, accelerator=self.accelerator)
-        else:
-            non_finite_any = False
+        # All ranks must participate, including ranks with finite local loss.
+        # Finite loss can also produce non-finite gradients during backward.
+        non_finite_any = has_non_finite_loss_and_gradients(
+            loss=loss, model=self.model, accelerator=self.accelerator
+        )
         
         if non_finite_any:
             skip_nan_grad_step = True
             self.accelerator.print(f"[Step {self.global_step}] Non-finite detected. Skipping optimizer step.")
             self.optimizer.zero_grad(set_to_none=True)
+            self._optimizer_step_has_memory = False
         else:
+            if self.accelerator.sync_gradients and not self._global_optimizer_step_has_memory():
+                self._clear_compression_group_grads()
             
             if self.accelerator.sync_gradients:
                 self.accelerator.clip_grad_norm_(self.model.parameters(), self.training_args.max_grad_norm)
@@ -1426,6 +1506,7 @@ class LCLMTrainer:
             # Step scheduler only at end of gradient accumulation
             if self.accelerator.sync_gradients:
                 self.scheduler.step()
+                self._optimizer_step_has_memory = False
 
             # Zero gradients
             self.optimizer.zero_grad()
@@ -1437,6 +1518,21 @@ class LCLMTrainer:
             return loss.item()
             
         return None
+
+    def _global_optimizer_step_has_memory(self) -> bool:
+        """Return whether any rank/microbatch used a real memory region."""
+        return global_has_memory(
+            bool(getattr(self, "_optimizer_step_has_memory", False)),
+            device=self.accelerator.device,
+            distributed=self.accelerator.num_processes > 1,
+        )
+
+    def _clear_compression_group_grads(self) -> None:
+        """Make a globally uncompressed step a true optimizer no-op for LCLM."""
+        clear_optimizer_group_grads(
+            self.optimizer,
+            getattr(self, "_compression_param_group_indices", set()),
+        )
         
     
             

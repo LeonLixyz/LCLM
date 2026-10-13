@@ -263,3 +263,6 @@ benchmark/new_outputs/
 
 # Modal orchestration (local-only, not part of public repo)
 _modal_run/
+
+# Evaluation and benchmark outputs
+runs/

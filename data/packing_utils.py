@@ -1,5 +1,5 @@
 """
-Complete packing implementation for Code-LLaVA with flex attention.
+Packing implementation for LCLM with flex attention.
 Clean, tested, production-ready code.
 """
 

@@ -1,8 +1,8 @@
 import os
-from typing import List, Dict
+from typing import Any, List, Dict
 
 import torch
-from data.chat_utils import build_prompt_and_target_text
+from data.chat_utils import build_prompt_and_target_text, tokenize_qwen_agent_conversation
 from data.packing_utils import collate_multiple_packed_batches
 
 # StatefulDataLoader for dynamic packing with auto-resume
@@ -14,8 +14,32 @@ except ImportError as e:
     print(f"[WARNING] StatefulDataLoader not available: {e}")
 
 
+def _native_agent_messages(example: Dict[str, Any]):
+    messages = example.get("messages")
+    conversations = example.get("conversations")
+    if messages is not None and conversations is not None and messages != conversations:
+        raise ValueError("Agent example has conflicting messages and conversations")
+    selected = messages if messages is not None else conversations
+    if selected is None:
+        return None
+    if not isinstance(selected, list) or not selected:
+        raise ValueError("Agent trajectory must be a nonempty message list")
+    return selected
+
+
+def _contains_memory_marker(value: Any) -> bool:
+    markers = ("<|memory_start|>", "<|memory_end|>", "<|memory|>")
+    if isinstance(value, str):
+        return any(marker in value for marker in markers)
+    if isinstance(value, dict):
+        return any(_contains_memory_marker(item) for item in value.values())
+    if isinstance(value, (list, tuple)):
+        return any(_contains_memory_marker(item) for item in value)
+    return False
+
+
 def collate_batch(
-    examples: List[Dict[str, str]],
+    examples: List[Dict[str, Any]],
     processor,
     max_memory_length: int,
 ):
@@ -35,8 +59,14 @@ def collate_batch(
     chat_indices = []
     continual_examples = []
     continual_indices = []
+    agent_examples = []
+    agent_indices = []
 
     for i, ex in enumerate(examples):
+        if _native_agent_messages(ex) is not None:
+            agent_indices.append(i)
+            agent_examples.append(ex)
+            continue
         target = ex.get("target", "")
         if target == "NA_string_only":
             continual_indices.append(i)
@@ -46,6 +76,26 @@ def collate_batch(
             chat_examples.append(ex)
 
     results = [None] * len(examples)
+
+    # Native traces intentionally bypass compression and supervise every
+    # assistant turn in the tokenizer's Qwen chat serialization.
+    for idx, ex in zip(agent_indices, agent_examples):
+        messages = _native_agent_messages(ex)
+        if _contains_memory_marker(messages) or _contains_memory_marker(ex.get("tools")):
+            raise ValueError("Agent trajectories must not contain LCLM memory markers")
+        agent_result = tokenize_qwen_agent_conversation(
+            messages,
+            tokenizer=tokenizer,
+            tools=ex.get("tools"),
+        )
+        results[idx] = {
+            'input_ids': torch.tensor(agent_result['input_ids'], dtype=torch.long),
+            'attention_mask': torch.tensor(agent_result['attention_mask'], dtype=torch.long),
+            'labels': torch.tensor(agent_result['labels'], dtype=torch.long),
+            'memory_positions': [],
+            'latent_counts': [],
+            'memory_token_ids': [],
+        }
 
     # Process chat format examples
     if chat_examples:

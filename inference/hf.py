@@ -11,6 +11,7 @@ import json
 import os
 
 import torch
+from peft import PeftModel
 from safetensors.torch import load_file as load_safetensors
 from transformers import AutoConfig, AutoModel, AutoModelForCausalLM, AutoTokenizer
 
@@ -23,6 +24,7 @@ def load_model(
     device="cuda",
     max_memory_length=12288,
     dtype="bf16",
+    revision=None,
     **overrides,
 ):
     """Load an LCLM checkpoint.
@@ -31,7 +33,8 @@ def load_model(
     and a ``model_config.json`` written by ``utils.checkpointing.save_model_config``.
     All model-shape settings (``compression_ratio``, ``encoder_window_size``, ``pooling``,
     ``encoder_mask_type``, ``boundary_overlap``, ``adapter_type``, ``num_adapter_layers``)
-    come from that config; pass ``**overrides`` only to override.
+    come from that config; pass ``**overrides`` only to override. For a Hugging
+    Face repo id, ``revision`` selects a branch, tag (e.g. ``"v1.0"``) or commit.
     """
     print(f"Loading checkpoint: {checkpoint_path}")
 
@@ -40,16 +43,16 @@ def load_model(
         if "/" in checkpoint_path and not checkpoint_path.startswith("/"):
             from huggingface_hub import snapshot_download
             print(f"Downloading {checkpoint_path} from HF hub...")
-            checkpoint_path = snapshot_download(repo_id=checkpoint_path, repo_type="model")
+            checkpoint_path = snapshot_download(repo_id=checkpoint_path, repo_type="model", revision=revision)
         else:
             raise FileNotFoundError(f"Checkpoint path does not exist: {checkpoint_path}")
 
     # Local directory with decoder/, encoder/, adapter/ subdirs.
     decoder_dir = os.path.join(checkpoint_path, "decoder")
     embed_dir = os.path.join(checkpoint_path, "encoder")
-    projectors_dir = os.path.join(checkpoint_path, "adapter")
+    adapter_dir = os.path.join(checkpoint_path, "adapter")
 
-    if not all(os.path.exists(d) for d in [decoder_dir, embed_dir, projectors_dir]):
+    if not all(os.path.exists(d) for d in [decoder_dir, embed_dir, adapter_dir]):
         candidates = [
             os.path.join(checkpoint_path, d) for d in os.listdir(checkpoint_path)
             if d.startswith("checkpoint_") and os.path.isdir(os.path.join(checkpoint_path, d))
@@ -58,7 +61,7 @@ def load_model(
             latest_checkpoint = sorted(candidates, key=lambda p: int(os.path.basename(p).split('_')[1]))[-1]
             decoder_dir = os.path.join(latest_checkpoint, "decoder")
             embed_dir = os.path.join(latest_checkpoint, "encoder")
-            projectors_dir = os.path.join(latest_checkpoint, "adapter")
+            adapter_dir = os.path.join(latest_checkpoint, "adapter")
         else:
             raise FileNotFoundError(f"No valid checkpoint structure found in {checkpoint_path}")
 
@@ -85,7 +88,7 @@ def load_model(
 
     print(f"Loading LLM from: {decoder_dir}")
     print(f"Loading embedder from: {embed_dir}")
-    print(f"Loading projectors from: {projectors_dir}")
+    print(f"Loading adapter from: {adapter_dir}")
 
     # Set dtype and attention implementation. Flash attention is preferred
     # for bf16/fp16 but falls back to sdpa when the package isn't installed
@@ -196,7 +199,7 @@ def load_model(
     )
 
     # Load adapter weights
-    adapter_path = os.path.join(projectors_dir, "adapter.safetensors")
+    adapter_path = os.path.join(adapter_dir, "adapter.safetensors")
     if os.path.isfile(adapter_path):
         adapter_state = load_safetensors(adapter_path)
         model.adapter.load_state_dict(adapter_state, strict=True)

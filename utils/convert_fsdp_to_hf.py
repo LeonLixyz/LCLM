@@ -416,7 +416,7 @@ def convert_fsdp_to_hf(
         max_memory_length=max_memory_length,
     )
     
-    ### CREATE CODELLAVA MODEL ###
+    ### CREATE LCLM MODEL ###
     model = LCLM(
         decoder=decoder,
         decoder_tokenizer=decoder_tokenizer,
@@ -533,11 +533,11 @@ def convert_fsdp_to_hf(
     # Create structured output directories
     decoder_dir = os.path.join(output_dir, "decoder")
     encoder_dir = os.path.join(output_dir, "encoder")
-    projectors_dir = os.path.join(output_dir, "adapter")
+    adapter_dir = os.path.join(output_dir, "adapter")
     
     os.makedirs(decoder_dir, exist_ok=True)
     os.makedirs(encoder_dir, exist_ok=True)
-    os.makedirs(projectors_dir, exist_ok=True)
+    os.makedirs(adapter_dir, exist_ok=True)
     
     # Save in fp32 to preserve full precision from mixed-precision training
     # (optimizer maintains fp32 master weights)
@@ -562,7 +562,7 @@ def convert_fsdp_to_hf(
     # Save adapter
     print("Saving adapter...")
     adapter_state = {k: v.detach().cpu() for k, v in model.adapter.state_dict().items()}
-    save_safetensors(adapter_state, os.path.join(projectors_dir, "adapter.safetensors"))
+    save_safetensors(adapter_state, os.path.join(adapter_dir, "adapter.safetensors"))
     
     # Save model configuration
     print("Saving model configuration...")

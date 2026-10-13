@@ -3,52 +3,32 @@
 NaN/Inf loss and gradient checks utilities
 """
 
-from typing import Tuple
+from collections import defaultdict
 import torch
 
 
-def has_non_finite_loss_and_gradients(*, loss: torch.Tensor, model, accelerator) -> bool:
+def has_non_finite_loss_and_gradients(*, loss: torch.Tensor, model, accelerator, gradients=None) -> bool:
     """Return True if any rank sees non-finite loss or gradients.
 
     - Checks local loss and gradients for non-finite values.
     - Uses distributed reduction via the provided accelerator to synchronize the decision.
     """
-    # Local checks
-    non_finite_loss_local = not torch.isfinite(loss).item()
-
-    non_finite_grad_local = False
-    for name, param in model.named_parameters():
-        if param.grad is not None and not torch.isfinite(param.grad).all():
-            print(
-                f"[rank {accelerator.process_index}] Non-finite gradient in {name} shape={tuple(param.grad.shape)}",
-                flush=True,
-            )
-            non_finite_grad_local = True
-            break
-
-    if non_finite_loss_local:
-        print(
-            f"[rank {accelerator.process_index}] Non-finite loss detected: {loss.item()}",
-            flush=True,
-        )
-
-    # Sync decision across ranks
-    try:
-        loss_flag_tensor = torch.tensor(
-            1 if non_finite_loss_local else 0,
-            device=accelerator.device,
-            dtype=torch.int32,
-        )
-        grad_flag_tensor = torch.tensor(
-            1 if non_finite_grad_local else 0,
-            device=accelerator.device,
-            dtype=torch.int32,
-        )
-
-        loss_any = accelerator.reduce(loss_flag_tensor, reduction="max").item() > 0
-        grad_any = accelerator.reduce(grad_flag_tensor, reduction="max").item() > 0
-        return loss_any or grad_any
-    except Exception:
-        return non_finite_grad_local or non_finite_loss_local
-
-
+    # Keep the scan on device, without a host synchronization per parameter.
+    # Infinity norms cannot overflow from adding otherwise finite gradients.
+    groups = defaultdict(list)
+    if gradients is None:
+        gradients = (param.grad for param in model.parameters())
+    for gradient in gradients:
+        if gradient is not None and gradient.numel():
+            grad = gradient.detach()
+            if grad.is_sparse:
+                grad = grad.coalesce().values()
+            groups[(grad.device, grad.dtype)].append(grad)
+    flags = [~torch.isfinite(loss.detach()).all().to(accelerator.device)]
+    for gradients in groups.values():
+        norms = torch._foreach_norm(gradients, float('inf'))
+        flags.append(~torch.isfinite(torch.stack(norms)).all().to(accelerator.device))
+    local_flag = torch.stack(flags).any().to(dtype=torch.int32)
+    # Every rank must call this, even when its own loss is finite. Never hide a
+    # failed collective by falling back to a rank-local optimizer decision.
+    return accelerator.reduce(local_flag, reduction="sum").item() > 0

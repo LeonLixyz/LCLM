@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Entrypoint for training Code LLaVA using the organized modules.
+Entrypoint for training LCLM.
 Parses CLI args into a TrainingConfig and invokes the trainer.
 
 Usage:
@@ -451,7 +451,7 @@ class TrainingConfig:
         metadata={"help": "Whether to load only the model from the checkpoint."},
     )
     wandb_project: str = field(
-        default="code-llava",
+        default="lclm",
         metadata={"help": "WandB project name."},
     )
     wandb_name: str = field(
